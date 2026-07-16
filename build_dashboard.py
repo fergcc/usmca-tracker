@@ -431,11 +431,11 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .feed { display: flex; flex-direction: column; gap: 0.7rem; }
   #dash .empty-state { margin: 2rem auto; color: var(--ink-muted); font-size: 0.9rem; text-align: center; }
 
-  /* ---------- signal rail: fixed, full viewport height, flush right ---------- */
+  /* ---------- signal rail: floating pill, fixed to viewport ---------- */
   #dash .signal-rail {
-    position: fixed; top: 0; right: 0; bottom: 0; height: 100vh; height: 100dvh;
-    width: 84px; flex: none; z-index: 30; border-radius: 0;
-    border-top: none; border-right: none; border-bottom: none;
+    position: fixed; top: 50%; right: 24px; transform: translateY(-50%);
+    height: 380px;
+    width: 84px; flex: none; z-index: 30; border-radius: 999px;
     display: flex; flex-direction: column; align-items: center; justify-content: space-between;
     padding: 1.4rem 0.5rem;
     gap: 0.6rem;
@@ -499,7 +499,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   @media (max-width: 880px) {
     #dash .tracker-inner { padding-right: clamp(1rem, 4vw, 3.5rem); }
     #dash .signal-rail {
-      position: static; width: 100%; height: auto; flex-direction: row; justify-content: flex-start;
+      position: static; width: 100%; height: auto; transform: none; flex-direction: row; justify-content: flex-start;
       padding: 0.85rem 1.1rem; margin-bottom: 1.1rem; border-radius: 18px;
     }
     #dash .rail-label { writing-mode: horizontal-tb; text-align: left; }
