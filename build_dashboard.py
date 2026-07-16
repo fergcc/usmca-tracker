@@ -379,7 +379,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .clock-point.is-today .clock-label time { color: var(--sig-critical); }
 
   /* ---------- stat strip ---------- */
-  #dash .stat-strip { margin: 0 0 1.1rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem; }
+  #dash .stat-strip { margin: 0 0 1.1rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
   #dash .stat-tile { border-radius: 16px; padding: 0.95rem 1.05rem; min-width: 0; }
   #dash .stat-label { margin: 0 0 0.35rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-muted); }
   #dash .stat-value { margin: 0; font-size: 1.65rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--ink); }
@@ -604,7 +604,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   <section id="panel-tracker" class="panel panel-tracker" role="region" aria-label="Tracker" hidden>
     <div class="tracker-inner">
-      <p class="tracker-meta">Generated __GENERATED__ &middot; <span id="itemCount">0</span> dispatches &middot; <span id="rangeText">&mdash;</span></p>
+      <p class="tracker-meta">Generated __GENERATED__ &middot; <span id="rangeText">&mdash;</span></p>
 
       <div class="tracker-topbar glass" id="trackerTopbar">
         <button type="button" class="back-btn" id="backToWelcomeBtn" aria-label="Back to Welcome">&larr;</button>
@@ -627,7 +627,6 @@ TEMPLATE = r"""<meta charset="utf-8">
       </section>
 
       <section class="stat-strip" aria-label="Summary">
-        <div class="stat-tile glass"><p class="stat-label">Dispatches</p><p class="stat-value" id="statTotal">0</p><p class="stat-sub" id="statRange">&nbsp;</p></div>
         <div class="stat-tile glass stat-tile--critical"><p class="stat-label">Critical signal</p><p class="stat-value" id="statCritical">0</p><p class="stat-sub">score &ge; 10</p></div>
         <div class="stat-tile glass"><p class="stat-label">Most active principal</p><p class="stat-value stat-value--text" id="statPlayer">&mdash;</p><p class="stat-sub" id="statPlayerCount">&nbsp;</p></div>
         <div class="stat-tile glass stat-tile--composition"><p class="stat-label">Source mix</p><div class="comp-bar" id="compBar" role="img" aria-label="Source composition"></div><div class="comp-legend" id="compLegend"></div></div>
@@ -707,13 +706,10 @@ TEMPLATE = r"""<meta charset="utf-8">
   }
 
   function computeStats() {
-    document.getElementById("itemCount").textContent = DATA.length;
-    document.getElementById("statTotal").textContent = DATA.length;
     document.getElementById("welcomeCount").textContent = DATA.length;
 
     const tsList = DATA.map(d => d.publishedTs).filter(Boolean).sort((a, b) => a - b);
     const rangeStr = tsList.length ? fmtRange(tsList[0], tsList[tsList.length - 1]) : "";
-    document.getElementById("statRange").textContent = rangeStr ? `covering ${rangeStr}` : "";
     document.getElementById("rangeText").textContent = rangeStr || "";
 
     const critical = DATA.filter(d => d.score >= 10).length;
