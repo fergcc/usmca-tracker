@@ -3,7 +3,12 @@ name: Update USMCA dashboard
 on:
   schedule:
     - cron: "0 */6 * * *"  # every 6 hours
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      backfill_images:
+        description: "One-off: backfill og:image for existing items instead of a normal run"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -40,7 +45,12 @@ jobs:
       - name: Run tracker
         env:
           CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
-        run: python3 usmca_tracker.py --config config.yaml
+        run: |
+          if [ "${{ github.event.inputs.backfill_images }}" = "true" ]; then
+            python3 usmca_tracker.py --config config.yaml --backfill-images
+          else
+            python3 usmca_tracker.py --config config.yaml
+          fi
 
       - name: Save tracker state
         if: always()

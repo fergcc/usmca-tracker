@@ -73,6 +73,7 @@ def prep(it: dict) -> dict:
         "score": it["score"],
         "tags": it.get("tags", []),
         "paywalled": is_paywalled,
+        "image": it.get("image_url", ""),
     }
 
 
@@ -100,7 +101,8 @@ def main():
     print(f"Wrote {OUT_PATH} ({len(html_out):,} bytes, {len(items)} items)")
 
 
-TEMPLATE = r"""<title>USMCA Signal Desk</title>
+TEMPLATE = r"""<meta charset="utf-8">
+<title>USMCA Signal Desk</title>
 <style>
   #dash, #dash * { box-sizing: border-box; }
   #dash {
@@ -243,6 +245,18 @@ TEMPLATE = r"""<title>USMCA Signal Desk</title>
     margin: 0; font-size: 0.86rem; color: var(--ink-soft);
     font-variant-numeric: tabular-nums;
   }
+  #dash .refresh-row {
+    margin-top: 0.6rem; display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;
+  }
+  #dash .refresh-btn {
+    font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    padding: 0.4rem 0.8rem; border-radius: 7px;
+    border: 1px solid var(--hairline); background: var(--paper-raised); color: var(--accent);
+  }
+  #dash .refresh-btn:hover:not(:disabled) { background: var(--accent-soft); }
+  #dash .refresh-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #dash .refresh-btn:disabled { cursor: default; opacity: 0.55; }
+  #dash .refresh-status { font-size: 0.8rem; color: var(--ink-muted); }
 
   #dash .review-clock {
     max-width: 920px; margin: 1.35rem auto 0; padding: 0 1.5rem;
@@ -411,6 +425,11 @@ TEMPLATE = r"""<title>USMCA Signal Desk</title>
   #dash .card-stripe { width: 4px; flex: none; background: var(--sig-routine); }
   #dash .card--critical .card-stripe { background: var(--sig-critical); }
   #dash .card--notable .card-stripe { background: var(--sig-notable); }
+  #dash .card-thumb {
+    width: 96px; height: 96px; flex: none; object-fit: cover;
+    background: var(--paper-sunken);
+  }
+  @media (max-width: 560px) { #dash .card-thumb { width: 72px; height: 72px; } }
   #dash .card-body { padding: 0.95rem 1.1rem 1rem; min-width: 0; flex: 1; }
   #dash .card-top { display: flex; gap: 0.85rem; align-items: flex-start; }
   #dash .score-badge {
@@ -513,6 +532,10 @@ TEMPLATE = r"""<title>USMCA Signal Desk</title>
       <p class="eyebrow">Scientika &middot; Trade Intelligence</p>
       <h1>USMCA Joint Review &mdash; Signal Desk</h1>
       <p class="run-meta">Generated __GENERATED__ &middot; <span id="itemCount">0</span> dispatches &middot; <span id="rangeText">&mdash;</span></p>
+      <div class="refresh-row">
+        <button type="button" id="refreshBtn" class="refresh-btn">&#8635; Refresh now</button>
+        <span id="refreshStatus" class="refresh-status" role="status" aria-live="polite"></span>
+      </div>
     </div>
   </header>
 
@@ -702,10 +725,14 @@ TEMPLATE = r"""<title>USMCA Signal Desk</title>
     const summaryHtml = item.summary ? `<p class="card-summary">${escapeHtml(item.summary)}</p>` : "";
     const lockBadge = item.paywalled ? `<span class="lock-badge">headlines only</span>` : "";
     const dateHtml = item.publishedDisplay ? `<span class="dot">&middot;</span><time>${escapeHtml(item.publishedDisplay)}</time>` : "";
+    const imgHtml = item.image
+      ? `<img class="card-thumb" src="${escapeHtml(item.image)}" alt="" loading="lazy" onerror="this.remove()">`
+      : "";
     const rot = ((item.score * 53) % 7) - 3;
     return `
       <article class="card card--${band(item.score)}">
         <div class="card-stripe"></div>
+        ${imgHtml}
         <div class="card-body">
           <div class="card-top">
             <span class="score-badge" style="--stamp-rot:${rot}deg">${item.score}</span>
@@ -779,6 +806,32 @@ TEMPLATE = r"""<title>USMCA Signal Desk</title>
         state.sort = btn.dataset.sort;
         render();
       });
+    });
+
+    const refreshBtn = document.getElementById("refreshBtn");
+    const refreshStatus = document.getElementById("refreshStatus");
+    refreshBtn.addEventListener("click", () => {
+      refreshBtn.disabled = true;
+      refreshStatus.textContent = "Solicitando actualización…";
+      fetch("/api/refresh", { method: "POST" })
+        .then(async res => {
+          const body = await res.json().catch(() => ({}));
+          if (res.status === 202) {
+            refreshStatus.textContent = "Actualización en marcha — la página se recargará en ~90s.";
+            setTimeout(() => location.reload(), 90000);
+          } else if (res.status === 429) {
+            const wait = body.retryAfterSeconds || 60;
+            refreshStatus.textContent = `Ya se actualizó hace poco. Intenta de nuevo en ${wait}s.`;
+            setTimeout(() => { refreshBtn.disabled = false; refreshStatus.textContent = ""; }, wait * 1000);
+          } else {
+            refreshStatus.textContent = "No se pudo iniciar la actualización, intenta más tarde.";
+            refreshBtn.disabled = false;
+          }
+        })
+        .catch(() => {
+          refreshStatus.textContent = "No se pudo iniciar la actualización, intenta más tarde.";
+          refreshBtn.disabled = false;
+        });
     });
 
     render();

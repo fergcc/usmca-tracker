@@ -123,3 +123,13 @@ match:
 limits:
   max_items_per_source: 40
   http_timeout_seconds: 25
+
+# Article thumbnails: reads the og:image (falls back to twitter:image) meta
+# tag off each new item's own page. Only runs for genuinely new items, never
+# re-fetched on later runs. Skipped for paywalled sources.
+images:
+  enabled: true
+  timeout_seconds: 10
+  max_html_bytes: 200000
+  skip_sources:
+    - "Inside U.S. Trade"

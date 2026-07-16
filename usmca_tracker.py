@@ -29,6 +29,7 @@ import sqlite3
 import subprocess
 import sys
 import textwrap
+import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field, asdict
@@ -86,6 +87,7 @@ class Item:
     summary: str = ""
     score: int = 0
     tags: list[str] = field(default_factory=list)
+    image_url: str = ""
 
 
 # --------------------------------------------------------------------------- #
@@ -196,6 +198,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "max_items_per_source": 40,
         "http_timeout_seconds": 25,
     },
+    # Article thumbnails: reads the og:image (falls back to twitter:image) meta
+    # tag off each new item's own page. Skipped for paywalled sources out of
+    # respect for their ToS (headlines/snippets only, same policy as elsewhere).
+    "images": {
+        "enabled": True,
+        "timeout_seconds": 10,
+        "max_html_bytes": 200_000,
+        "skip_sources": [
+            "Inside U.S. Trade",
+        ],
+    },
 }
 
 
@@ -229,6 +242,30 @@ def http_get(url: str, timeout: int) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
+
+
+_OG_IMAGE_RE = re.compile(
+    r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\'][^>]+content=["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+_OG_IMAGE_RE_SWAPPED = re.compile(
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\']',
+    re.IGNORECASE,
+)
+
+
+def fetch_og_image(url: str, timeout: int, max_bytes: int) -> str:
+    """Best-effort og:image (falling back to twitter:image) off an article's
+    own <head>. Only reads the first `max_bytes` of the response since the
+    tag is always near the top — avoids downloading full article pages."""
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read(max_bytes)
+    html = raw.decode("utf-8", errors="ignore")
+    m = _OG_IMAGE_RE.search(html) or _OG_IMAGE_RE_SWAPPED.search(html)
+    if not m:
+        return ""
+    return urllib.parse.urljoin(url, m.group(1).strip())
 
 
 # --------------------------------------------------------------------------- #
@@ -542,6 +579,25 @@ def gather(cfg: dict[str, Any]) -> list[Item]:
     return collected
 
 
+def enrich_images(items: list[Item], cfg: dict[str, Any]) -> None:
+    """Mutates each item in place, setting .image_url when a thumbnail can be
+    found. Skips paywalled/ToS-restricted sources. Never raises — a failed
+    fetch just leaves image_url empty, same as any other best-effort source."""
+    icfg = cfg["images"]
+    if not icfg.get("enabled"):
+        return
+    skip = tuple(icfg.get("skip_sources", []))
+    timeout = int(icfg.get("timeout_seconds", 10))
+    max_bytes = int(icfg.get("max_html_bytes", 200_000))
+    for it in items:
+        if it.source.startswith(skip):
+            continue
+        try:
+            it.image_url = fetch_og_image(it.url, timeout, max_bytes)
+        except Exception as exc:
+            print(f"[warn] image fetch failed for {it.url}: {exc}", file=sys.stderr)
+
+
 def run(cfg: dict[str, Any], base: Path, dry_run: bool) -> int:
     db = open_db(base / "data" / "seen.db")
     require_any = cfg["match"]["require_any"]
@@ -561,6 +617,9 @@ def run(cfg: dict[str, Any], base: Path, dry_run: bool) -> int:
         candidates.append(it)
 
     new_items = [it for it in candidates if is_new(db, it.uid)]
+
+    if not dry_run:
+        enrich_images(new_items, cfg)
 
     print(f"Fetched {len(raw)} raw → {len(candidates)} matched → {len(new_items)} NEW")
 
@@ -590,6 +649,40 @@ def run(cfg: dict[str, Any], base: Path, dry_run: bool) -> int:
     return 0
 
 
+def backfill_images(cfg: dict[str, Any], base: Path) -> int:
+    """One-off pass over the whole items.jsonl history, filling in image_url
+    for any record that doesn't already have one. Rewrites the file in place.
+    Meant to be run manually/once — not part of the regular scheduled run."""
+    icfg = cfg["images"]
+    skip = tuple(icfg.get("skip_sources", []))
+    timeout = int(icfg.get("timeout_seconds", 10))
+    max_bytes = int(icfg.get("max_html_bytes", 200_000))
+    path = base / "data" / "items.jsonl"
+    if not path.exists():
+        print(f"No items.jsonl at {path}, nothing to backfill.")
+        return 0
+
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    todo = [r for r in rows if not r.get("image_url") and not r.get("source", "").startswith(skip)]
+    print(f"{len(rows)} items total, {len(todo)} missing an image.")
+
+    done = 0
+    for i, r in enumerate(todo, 1):
+        try:
+            r["image_url"] = fetch_og_image(r["url"], timeout, max_bytes)
+            if r["image_url"]:
+                done += 1
+        except Exception as exc:
+            print(f"[warn] image fetch failed for {r['url']}: {exc}", file=sys.stderr)
+        if i % 20 == 0:
+            print(f"  ...{i}/{len(todo)} processed")
+        time.sleep(0.3)  # be polite to hosts
+
+    path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8")
+    print(f"Backfill done: {done}/{len(todo)} got an image. Rewrote {path}.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="USMCA/T-MEC/CUSMA negotiation tracker")
     ap.add_argument("--config", type=Path, default=None,
@@ -600,6 +693,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Fetch & show new items but save/notify nothing")
     ap.add_argument("--print-queries", action="store_true",
                     help="Print the Boolean queries (for Feedly/Inoreader/Alerts) and exit")
+    ap.add_argument("--backfill-images", action="store_true",
+                    help="One-off: fill in image_url for existing items.jsonl rows that lack one, then exit")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -608,6 +703,9 @@ def main(argv: list[str] | None = None) -> int:
         for _, q in cfg["queries"].items():
             print(f"# {q['label']}\n{q['boolean']}\n")
         return 0
+
+    if args.backfill_images:
+        return backfill_images(cfg, args.base)
 
     return run(cfg, args.base, args.dry_run)
 
