@@ -648,6 +648,10 @@ TEMPLATE = r"""<meta charset="utf-8">
             <option value="Multilateral">Multilateral</option>
           </select>
         </label>
+        <label class="filter-select-wrap">
+          <span class="filter-select-label">Actor</span>
+          <select id="actorFilter" class="filter-select" aria-label="Filter by actor"><option value="All">All</option></select>
+        </label>
         <div class="sort-toggle glass" role="group" aria-label="Sort order">
           <button type="button" class="sort-btn is-active" data-sort="score">Signal</button>
           <button type="button" class="sort-btn" data-sort="date">Newest</button>
@@ -760,6 +764,19 @@ TEMPLATE = r"""<meta charset="utf-8">
       opt.textContent = `${g} (${counts[g]})`;
       sel.appendChild(opt);
     });
+
+    const actorCounts = {};
+    DATA.forEach(d => (d.tags || []).forEach(t => {
+      if (t.startsWith("@")) actorCounts[t.slice(1)] = (actorCounts[t.slice(1)] || 0) + 1;
+    }));
+    const actors = Object.keys(actorCounts).sort((a, b) => actorCounts[b] - actorCounts[a]);
+    const actorSel = document.getElementById("actorFilter");
+    actors.forEach(a => {
+      const opt = document.createElement("option");
+      opt.value = a;
+      opt.textContent = `${a} (${actorCounts[a]})`;
+      actorSel.appendChild(opt);
+    });
   }
 
   function escapeHtml(s) {
@@ -808,13 +825,14 @@ TEMPLATE = r"""<meta charset="utf-8">
       </article>`;
   }
 
-  let state = { query: "", minScore: 0, sort: "score", source: "All", country: "All" };
+  let state = { query: "", minScore: 0, sort: "score", source: "All", country: "All", actor: "All" };
 
   function render() {
     const q = state.query.trim().toLowerCase();
     let filtered = DATA.filter(d => {
       if (state.source !== "All" && groupLabel(d) !== state.source) return false;
       if (state.country !== "All" && countryOf(d) !== state.country) return false;
+      if (state.actor !== "All" && !(d.tags || []).includes("@" + state.actor)) return false;
       if (d.score < state.minScore) return false;
       if (q && !(`${d.title} ${d.summary}`.toLowerCase().includes(q))) return false;
       return true;
@@ -897,6 +915,10 @@ TEMPLATE = r"""<meta charset="utf-8">
     });
     document.getElementById("countryFilter").addEventListener("change", e => {
       state.country = e.target.value;
+      render();
+    });
+    document.getElementById("actorFilter").addEventListener("change", e => {
+      state.actor = e.target.value;
       render();
     });
 
