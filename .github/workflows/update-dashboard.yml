@@ -1,0 +1,65 @@
+name: Update USMCA dashboard
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # every 6 hours
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-dashboard
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python3 -m pip install -r requirements.txt
+
+      # data/ (items.jsonl, seen.db) holds dedupe state and is not committed
+      # to the repo (kept private). It's persisted across runs via cache
+      # instead, saved under a fresh key every run and restored from the
+      # most recent match, since actions/cache can't overwrite a key in place.
+      - name: Restore tracker state
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: usmca-data-${{ github.run_id }}
+          restore-keys: |
+            usmca-data-
+
+      - name: Run tracker
+        env:
+          CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+        run: python3 usmca_tracker.py --config config.yaml
+
+      - name: Save tracker state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: usmca-data-${{ github.run_id }}
+
+      - name: Rebuild dashboard
+        run: python3 build_dashboard.py
+
+      - name: Commit updated dashboard
+        run: |
+          git config user.name "usmca-tracker-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add dashboard.html
+          if git diff --cached --quiet; then
+            echo "No dashboard changes."
+          else
+            git commit -m "Auto-update dashboard $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
