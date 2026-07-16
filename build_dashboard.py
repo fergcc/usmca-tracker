@@ -130,11 +130,11 @@ TEMPLATE = r"""<meta charset="utf-8">
     --wash-opacity: 0.14;
     --page-base: linear-gradient(180deg, #fbfbfa, #eef0ee);
 
-    --glass-fill:        rgba(255,255,255,0.55);
-    --glass-fill-strong: rgba(255,255,255,0.74);
+    --glass-fill:        rgba(255,255,255,0.6);
+    --glass-fill-strong: rgba(255,255,255,0.79);
     --glass-border:      rgba(255,255,255,0.75);
     --glass-shadow:      0 10px 34px rgba(28,38,66,0.16), inset 0 1px 0 rgba(255,255,255,0.65);
-    --card-fill:   linear-gradient(160deg, rgba(255,255,255,0.84), rgba(255,255,255,0.6));
+    --card-fill:   linear-gradient(160deg, rgba(255,255,255,0.89), rgba(255,255,255,0.65));
     --card-border: rgba(255,255,255,0.75);
     --card-shadow: 0 6px 20px -6px rgba(28,38,66,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
 
@@ -169,11 +169,11 @@ TEMPLATE = r"""<meta charset="utf-8">
       --comp-congress: #5fbf8c;
       --wash-opacity: 0.1;
       --page-base: linear-gradient(180deg, #0c0e11, #111418);
-      --glass-fill:        rgba(255,255,255,0.08);
-      --glass-fill-strong: rgba(255,255,255,0.14);
+      --glass-fill:        rgba(255,255,255,0.13);
+      --glass-fill-strong: rgba(255,255,255,0.19);
       --glass-border:      rgba(255,255,255,0.16);
       --glass-shadow:      0 12px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
-      --card-fill:   linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.035));
+      --card-fill:   linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.085));
       --card-border: rgba(255,255,255,0.14);
       --card-shadow: 0 8px 22px -6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07);
       color-scheme: dark;
@@ -188,10 +188,10 @@ TEMPLATE = r"""<meta charset="utf-8">
     --comp-fedreg: #7ea6e8; --comp-gnews: #3aa88f; --comp-site: #ab9adf; --comp-congress: #5fbf8c;
     --wash-opacity: 0.1;
     --page-base: linear-gradient(180deg, #0c0e11, #111418);
-    --glass-fill: rgba(255,255,255,0.08); --glass-fill-strong: rgba(255,255,255,0.14);
+    --glass-fill: rgba(255,255,255,0.13); --glass-fill-strong: rgba(255,255,255,0.19);
     --glass-border: rgba(255,255,255,0.16);
     --glass-shadow: 0 12px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
-    --card-fill: linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.035));
+    --card-fill: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.085));
     --card-border: rgba(255,255,255,0.14);
     --card-shadow: 0 8px 22px -6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07);
     color-scheme: dark;
@@ -205,10 +205,10 @@ TEMPLATE = r"""<meta charset="utf-8">
     --comp-fedreg: #2451a3; --comp-gnews: #1f7a68; --comp-site: #6a4f8e; --comp-congress: #046a38;
     --wash-opacity: 0.14;
     --page-base: linear-gradient(180deg, #fbfbfa, #eef0ee);
-    --glass-fill: rgba(255,255,255,0.55); --glass-fill-strong: rgba(255,255,255,0.74);
+    --glass-fill: rgba(255,255,255,0.6); --glass-fill-strong: rgba(255,255,255,0.79);
     --glass-border: rgba(255,255,255,0.75);
     --glass-shadow: 0 10px 34px rgba(28,38,66,0.16), inset 0 1px 0 rgba(255,255,255,0.65);
-    --card-fill: linear-gradient(160deg, rgba(255,255,255,0.84), rgba(255,255,255,0.6));
+    --card-fill: linear-gradient(160deg, rgba(255,255,255,0.89), rgba(255,255,255,0.65));
     --card-border: rgba(255,255,255,0.75);
     --card-shadow: 0 6px 20px -6px rgba(28,38,66,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
     color-scheme: light;
