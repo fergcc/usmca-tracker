@@ -104,6 +104,7 @@ def main():
 TEMPLATE = r"""<meta charset="utf-8">
 <title>USMCA Signal Desk</title>
 <style>
+  html, body { margin: 0; padding: 0; }
   #dash, #dash * { box-sizing: border-box; }
   #dash {
     --ink:          #14171c;
@@ -146,7 +147,6 @@ TEMPLATE = r"""<meta charset="utf-8">
     display: block;
     position: relative;
     min-height: 100%;
-    padding: 0 0 4rem;
     background: var(--page-base);
   }
   @media (prefers-color-scheme: dark) {
@@ -242,102 +242,109 @@ TEMPLATE = r"""<meta charset="utf-8">
     box-shadow: var(--glass-shadow);
   }
 
-  /* ---------- tab switcher ---------- */
-  #dash .tab-switch {
-    position: sticky; top: 12px; z-index: 40;
-    width: fit-content; margin: 12px auto 0;
-    display: flex; padding: 4px; border-radius: 999px; gap: 2px;
-  }
-  #dash .tab-indicator {
-    position: absolute; top: 4px; bottom: 4px; left: 4px;
-    width: calc(50% - 4px); border-radius: 999px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    box-shadow: 0 4px 14px rgba(36,81,163,0.35);
-    transition: transform 0.35s cubic-bezier(.2,.8,.2,1);
-    z-index: 0;
-  }
-  #dash .tab-btn {
-    position: relative; z-index: 1;
-    font: inherit; font-size: 0.86rem; font-weight: 600; letter-spacing: 0.01em;
-    padding: 0.5rem 1.15rem; border-radius: 999px; border: none; background: transparent;
-    color: var(--ink-soft); cursor: pointer;
-  }
-  #dash .tab-btn.is-active { color: #fff; }
-  #dash .tab-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  @media (prefers-reduced-motion: reduce) { #dash .tab-indicator { transition: none; } }
-
-  #dash .panel { padding: 1.6rem 1.25rem 0; }
+  #dash .panel { padding: 1.6rem 1.25rem 4rem; }
   #dash .panel[hidden] { display: none !important; }
 
-  /* ---------- welcome panel ---------- */
-  #dash .panel-welcome { display: flex; justify-content: center; padding-top: clamp(1.5rem, 5vw, 4rem); }
+  /* ---------- welcome panel: exactly one viewport, no scroll ---------- */
+  #dash .panel-welcome {
+    padding: 0 clamp(2rem, 9vw, 8rem);
+    height: 100vh; height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
   #dash .welcome-card {
-    max-width: 700px; width: 100%; border-radius: 28px;
-    padding: clamp(1.8rem, 5vw, 3.2rem);
+    width: 100%; max-width: 900px; max-height: calc(100dvh - 3rem);
+    border-radius: 28px;
+    padding: clamp(1.4rem, 3.6vw, 2.5rem) clamp(1.6rem, 4vw, 3rem);
+    display: flex; flex-direction: column; justify-content: space-between; gap: 1rem;
+    overflow-y: auto;
   }
   #dash .eyebrow {
-    margin: 0 0 0.6rem;
+    margin: 0 0 0.5rem;
     font-family: "American Typewriter", "Courier New", ui-monospace, monospace;
-    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+    font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--ink-muted);
   }
   #dash .welcome-title {
-    margin: 0 0 0.7rem;
+    margin: 0 0 0.55rem;
     font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-    font-size: clamp(2.5rem, 6.2vw, 4.1rem);
-    font-weight: 600; letter-spacing: -0.01em; line-height: 1.02;
+    font-size: clamp(2.1rem, 4.6vw, 3.3rem);
+    font-weight: 600; letter-spacing: -0.01em; line-height: 1.03;
     text-wrap: balance;
     background: linear-gradient(115deg, var(--ink) 30%, var(--accent-2) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   #dash .welcome-sub {
-    margin: 0 0 1.3rem; font-size: clamp(1rem, 1.6vw, 1.18rem); color: var(--ink-soft);
-    line-height: 1.5; text-wrap: balance;
+    margin: 0 0 0.85rem; font-size: clamp(0.95rem, 1.4vw, 1.08rem); color: var(--ink-soft);
+    line-height: 1.45; text-wrap: balance;
   }
-  #dash .welcome-body { margin: 0 0 1.6rem; font-size: 0.95rem; color: var(--ink-soft); line-height: 1.65; }
-  #dash .how-steps { list-style: none; margin: 0 0 1.8rem; padding: 0; display: flex; flex-direction: column; gap: 1rem; }
-  #dash .how-steps li { display: flex; gap: 0.9rem; align-items: flex-start; }
+  #dash .welcome-body { margin: 0; font-size: 0.9rem; color: var(--ink-soft); line-height: 1.55; }
+  #dash .how-grid {
+    margin: 1.1rem 0 0; padding: 0; list-style: none;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 1.4rem;
+  }
+  #dash .how-item { display: flex; gap: 0.65rem; align-items: flex-start; }
   #dash .step-no {
-    flex: none; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+    flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-weight: 700; font-size: 0.85rem;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-weight: 700; font-size: 0.78rem;
     background: var(--accent-soft); color: var(--accent);
     border: 1px solid var(--glass-border);
   }
-  #dash .how-steps strong { color: var(--ink); }
-  #dash .how-steps div { color: var(--ink-soft); font-size: 0.93rem; line-height: 1.55; padding-top: 0.15rem; }
-  #dash .welcome-meta {
-    font-size: 0.82rem; color: var(--ink-muted); font-variant-numeric: tabular-nums;
-    padding-top: 1rem; margin-bottom: 1.3rem; border-top: 1px solid var(--hairline);
+  #dash .how-item strong { color: var(--ink); }
+  #dash .how-item div { color: var(--ink-soft); font-size: 0.84rem; line-height: 1.4; padding-top: 0.1rem; }
+  #dash .welcome-bottom {
+    margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
   }
+  #dash .welcome-meta { font-size: 0.78rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
   #dash .cta-btn {
-    font: inherit; font-size: 0.95rem; font-weight: 700; cursor: pointer;
-    padding: 0.75rem 1.5rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.5);
+    margin-left: auto;
+    font: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer;
+    padding: 1rem 2.1rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.5);
     background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
-    box-shadow: 0 10px 26px rgba(36,81,163,0.38);
+    box-shadow: 0 12px 28px rgba(36,81,163,0.4);
+    white-space: nowrap;
   }
   #dash .cta-btn:hover { filter: brightness(1.07); }
   #dash .cta-btn:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+  @media (max-width: 640px) {
+    #dash .how-grid { grid-template-columns: 1fr; }
+    #dash .welcome-bottom { flex-direction: column; align-items: stretch; }
+    #dash .cta-btn { margin-left: 0; text-align: center; }
+  }
 
   /* ---------- tracker panel shell ---------- */
-  #dash .tracker-inner { max-width: clamp(320px, 94vw, 1360px); margin: 0 auto; padding: 0 clamp(1rem, 4vw, 3.5rem); }
+  #dash .tracker-inner {
+    max-width: clamp(320px, 94vw, 1360px); margin: 0 auto;
+    padding: 0 clamp(1rem, 4vw, 3.5rem);
+    padding-right: calc(clamp(1rem, 4vw, 3.5rem) + 96px);
+  }
   #dash .tracker-meta {
     margin: 0.2rem 0 1rem; font-size: 0.84rem; color: var(--ink-soft);
     font-variant-numeric: tabular-nums; text-align: center;
   }
 
   #dash .tracker-topbar {
-    position: sticky; top: 66px; z-index: 25;
+    position: sticky; top: 12px; z-index: 25;
     display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;
     padding: 0.75rem 1rem; border-radius: 18px; margin-bottom: 1.3rem;
+    transition: opacity 0.15s linear;
   }
+  #dash .back-btn {
+    flex: none; width: 2.5rem; height: 2.5rem; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+    background: rgba(255,255,255,0.35); border: 1px solid var(--glass-border);
+    color: var(--ink-soft); cursor: pointer;
+  }
+  #dash .back-btn:hover { background: var(--accent-soft); color: var(--accent); }
+  #dash .back-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   #dash #searchInput {
     flex: 1 1 260px; min-width: 0;
     background: rgba(255,255,255,0.5); color: var(--ink);
     border: 1px solid var(--glass-border); border-radius: 11px;
     padding: 0.6rem 0.9rem; font-size: 0.9rem; font-family: inherit;
   }
-  :root[data-theme="dark"] #dash #searchInput, @media (prefers-color-scheme: dark) { }
   #dash #searchInput::placeholder { color: var(--ink-muted); }
   #dash #searchInput:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   #dash .refresh-row { display: flex; align-items: center; gap: 0.65rem; flex: none; flex-wrap: wrap; }
@@ -388,10 +395,27 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .comp-swatch { width: 8px; height: 8px; border-radius: 2px; flex: none; }
   #dash .comp-legend-count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-muted); }
 
-  /* ---------- chips + sort ---------- */
-  #dash .control-row--chipsort { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
-  #dash .control-row--chips { display: flex; flex-wrap: wrap; gap: 0.45rem; flex: 1; }
-  #dash .sort-toggle { display: flex; border-radius: 11px; overflow: hidden; flex: none; padding: 2px; }
+  /* ---------- filters (Sources / Country dropdowns) + sort ---------- */
+  #dash .control-row--chipsort { display: flex; align-items: flex-end; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
+  #dash .filter-select-wrap { display: flex; flex-direction: column; gap: 0.3rem; }
+  #dash .filter-select-label {
+    font-family: "American Typewriter", ui-monospace, monospace;
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+  #dash .filter-select {
+    font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--ink);
+    background: var(--card-fill); border: 1px solid var(--card-border); border-radius: 11px;
+    padding: 0.55rem 2.1rem 0.55rem 0.85rem; cursor: pointer; box-shadow: var(--card-shadow);
+    appearance: none; -webkit-appearance: none; max-width: 260px;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+      linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) center, calc(100% - 11px) center;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+  }
+  #dash .filter-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #dash .sort-toggle { display: flex; border-radius: 11px; overflow: hidden; flex: none; padding: 2px; margin-left: auto; }
   #dash .sort-btn {
     font-family: inherit; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em;
     color: var(--ink-soft); background: transparent; border: none; border-radius: 9px;
@@ -400,42 +424,31 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .sort-btn.is-active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
   #dash .sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-  #dash .chip {
-    font-family: inherit; font-size: 0.78rem; font-weight: 600;
-    color: var(--ink-soft); background: var(--card-fill);
-    border: 1px solid var(--card-border); border-radius: 999px;
-    padding: 0.36rem 0.75rem 0.36rem 0.6rem; cursor: pointer; white-space: nowrap;
-    display: inline-flex; align-items: center; gap: 0.4rem;
-    box-shadow: var(--card-shadow);
-  }
-  #dash .chip-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--chip-color, var(--ink-muted)); }
-  #dash .chip .chip-count { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
-  #dash .chip.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
-  #dash .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-
   #dash .result-count { margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 
-  /* ---------- tracker body: main + vertical signal rail ---------- */
-  #dash .tracker-body { display: grid; grid-template-columns: 1fr auto; gap: 1.6rem; align-items: start; }
+  /* ---------- feed ---------- */
   #dash .tracker-main { min-width: 0; }
   #dash .feed { display: flex; flex-direction: column; gap: 0.7rem; }
   #dash .empty-state { margin: 2rem auto; color: var(--ink-muted); font-size: 0.9rem; text-align: center; }
 
+  /* ---------- signal rail: fixed, full viewport height, flush right ---------- */
   #dash .signal-rail {
-    position: sticky; top: 140px;
-    width: 84px; height: 380px; flex: none;
+    position: fixed; top: 0; right: 0; bottom: 0; height: 100vh; height: 100dvh;
+    width: 84px; flex: none; z-index: 30; border-radius: 0;
+    border-top: none; border-right: none; border-bottom: none;
     display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-    padding: 1.1rem 0.5rem; border-radius: 22px; gap: 0.6rem;
+    padding: 1.4rem 0.5rem;
+    gap: 0.6rem;
   }
   #dash .rail-label {
     font-family: "American Typewriter", ui-monospace, monospace;
     font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--ink-muted); text-align: center; line-height: 1.35;
   }
-  #dash .slider-wrap { position: relative; width: 40px; height: 260px; display: flex; align-items: center; justify-content: center; }
+  #dash .slider-wrap { position: relative; width: 40px; flex: 1; display: flex; align-items: center; justify-content: center; }
   #dash #scoreSlider {
     position: absolute; top: 50%; left: 50%;
-    width: 260px; height: 40px;
+    width: min(70vh, 640px); height: 40px;
     transform: translate(-50%, -50%) rotate(-90deg);
     -webkit-appearance: none; appearance: none;
     background: transparent; margin: 0; cursor: pointer;
@@ -470,11 +483,24 @@ TEMPLATE = r"""<meta charset="utf-8">
     border-radius: 10px; padding: 0.2rem 0.55rem; min-width: 2.1rem; text-align: center;
   }
 
+  /* ---------- scroll-to-top ---------- */
+  #dash .scroll-top-btn {
+    position: fixed; left: 24px; bottom: 24px; z-index: 30;
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem; color: var(--accent); cursor: pointer; border: 1px solid var(--glass-border);
+    opacity: 0; pointer-events: none; transform: translateY(10px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #dash .scroll-top-btn.is-visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  #dash .scroll-top-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { #dash .scroll-top-btn { transition: none; } }
+
   @media (max-width: 880px) {
-    #dash .tracker-body { grid-template-columns: 1fr; }
+    #dash .tracker-inner { padding-right: clamp(1rem, 4vw, 3.5rem); }
     #dash .signal-rail {
       position: static; width: 100%; height: auto; flex-direction: row; justify-content: flex-start;
-      padding: 0.85rem 1.1rem; margin-bottom: 1.1rem;
+      padding: 0.85rem 1.1rem; margin-bottom: 1.1rem; border-radius: 18px;
     }
     #dash .rail-label { writing-mode: horizontal-tb; text-align: left; }
     #dash .slider-wrap { flex: 1; width: auto; height: 40px; }
@@ -539,7 +565,6 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   @media (max-width: 720px) {
     #dash .stat-strip { grid-template-columns: repeat(2, 1fr); }
-    #dash .tracker-topbar { top: 58px; }
     #dash .clock-label { font-size: 0.58rem; }
   }
   @media (prefers-reduced-motion: no-preference) {
@@ -557,34 +582,33 @@ TEMPLATE = r"""<meta charset="utf-8">
   <div class="bg-wash" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
   <a class="skip-link" href="#feed">Skip to dispatches</a>
 
-  <nav class="tab-switch glass" role="tablist" aria-label="Sections">
-    <span class="tab-indicator" aria-hidden="true"></span>
-    <button type="button" class="tab-btn is-active" role="tab" aria-selected="true" id="tab-welcome" data-tab="welcome">Welcome</button>
-    <button type="button" class="tab-btn" role="tab" aria-selected="false" id="tab-tracker" data-tab="tracker">Tracker</button>
-  </nav>
-
-  <section id="panel-welcome" class="panel panel-welcome" role="tabpanel" aria-labelledby="tab-welcome">
+  <section id="panel-welcome" class="panel panel-welcome" role="region" aria-label="Welcome">
     <div class="welcome-card glass">
-      <p class="eyebrow">Scientika &middot; Trade Intelligence</p>
-      <h1 class="welcome-title">The USMCA Watcher</h1>
-      <p class="welcome-sub">A live monitor for the USMCA / T&#8209;MEC / CUSMA joint review &mdash; 2026 through the 2036 sunset horizon.</p>
-      <p class="welcome-body">Every six hours, or the moment you ask, it pulls fresh notices from the Federal Register, bills from Congress.gov, and headlines from Google News and official sources across the U.S., Mexico, and Canada. Each dispatch gets scored for signal, checked against everything already seen, and only what's new and relevant reaches the feed.</p>
-      <ol class="how-steps">
-        <li><span class="step-no">1</span><div><strong>Watch.</strong> Polls the Federal Register, Congress.gov, and news feeds from all three countries, every 6 hours or on demand.</div></li>
-        <li><span class="step-no">2</span><div><strong>Score.</strong> Ranks each dispatch by signal &mdash; procedural moves, named principals like Greer, Ebrard, and Carney, and sector keywords like autos, steel, and dairy.</div></li>
-        <li><span class="step-no">3</span><div><strong>Filter out noise.</strong> De-duplicates against everything already seen, so the feed only ever shows what's new.</div></li>
-        <li><span class="step-no">4</span><div><strong>Deliver.</strong> Rebuilds the dashboard you're about to open, sortable by signal or by date.</div></li>
-      </ol>
-      <p class="welcome-meta"><span id="welcomeCount">0</span> dispatches tracked so far &middot; refreshed every 6 hours</p>
-      <button type="button" class="cta-btn" id="openTrackerBtn">Open the tracker &rarr;</button>
+      <div class="welcome-top">
+        <p class="eyebrow">Scientika &middot; Trade Intelligence</p>
+        <h1 class="welcome-title">The USMCA Watcher</h1>
+        <p class="welcome-sub">A live monitor for the USMCA / T&#8209;MEC / CUSMA joint review &mdash; 2026 through the 2036 sunset horizon.</p>
+        <p class="welcome-body">Every six hours, or the moment you ask, it pulls fresh notices from the Federal Register, Congress.gov, and news across the U.S., Mexico, and Canada &mdash; scores each one for signal, checks it against everything already seen, and delivers only what's new.</p>
+        <ul class="how-grid">
+          <li class="how-item"><span class="step-no">1</span><div><strong>Watch.</strong> Polls all three countries every 6 hours or on demand.</div></li>
+          <li class="how-item"><span class="step-no">2</span><div><strong>Score.</strong> Ranks by signal &mdash; procedural moves, principals, sectors.</div></li>
+          <li class="how-item"><span class="step-no">3</span><div><strong>Filter out noise.</strong> De-dupes so you only ever see what's new.</div></li>
+          <li class="how-item"><span class="step-no">4</span><div><strong>Deliver.</strong> Rebuilds the dashboard, sorted your way.</div></li>
+        </ul>
+      </div>
+      <div class="welcome-bottom">
+        <span class="welcome-meta"><span id="welcomeCount">0</span> dispatches tracked &middot; refreshed every 6 hours</span>
+        <button type="button" class="cta-btn" id="openTrackerBtn">Open the tracker &rarr;</button>
+      </div>
     </div>
   </section>
 
-  <section id="panel-tracker" class="panel panel-tracker" role="tabpanel" aria-labelledby="tab-tracker" hidden>
+  <section id="panel-tracker" class="panel panel-tracker" role="region" aria-label="Tracker" hidden>
     <div class="tracker-inner">
       <p class="tracker-meta">Generated __GENERATED__ &middot; <span id="itemCount">0</span> dispatches &middot; <span id="rangeText">&mdash;</span></p>
 
-      <div class="tracker-topbar glass">
+      <div class="tracker-topbar glass" id="trackerTopbar">
+        <button type="button" class="back-btn" id="backToWelcomeBtn" aria-label="Back to Welcome">&larr;</button>
         <input type="search" id="searchInput" placeholder="Search dispatches by title or summary&hellip;" aria-label="Search dispatches">
         <div class="refresh-row">
           <button type="button" id="refreshBtn" class="refresh-btn">&#8635; Refresh now</button>
@@ -603,7 +627,7 @@ TEMPLATE = r"""<meta charset="utf-8">
         </div>
       </section>
 
-      <section class="stat-strip glass-group" aria-label="Summary">
+      <section class="stat-strip" aria-label="Summary">
         <div class="stat-tile glass"><p class="stat-label">Dispatches</p><p class="stat-value" id="statTotal">0</p><p class="stat-sub" id="statRange">&nbsp;</p></div>
         <div class="stat-tile glass stat-tile--critical"><p class="stat-label">Critical signal</p><p class="stat-value" id="statCritical">0</p><p class="stat-sub">score &ge; 10</p></div>
         <div class="stat-tile glass"><p class="stat-label">Most active principal</p><p class="stat-value stat-value--text" id="statPlayer">&mdash;</p><p class="stat-sub" id="statPlayerCount">&nbsp;</p></div>
@@ -611,32 +635,45 @@ TEMPLATE = r"""<meta charset="utf-8">
       </section>
 
       <div class="control-row--chipsort">
-        <div class="control-row--chips" id="sourceChips"></div>
+        <label class="filter-select-wrap">
+          <span class="filter-select-label">Sources</span>
+          <select id="sourceFilter" class="filter-select" aria-label="Filter by source"><option value="All">All</option></select>
+        </label>
+        <label class="filter-select-wrap">
+          <span class="filter-select-label">Country</span>
+          <select id="countryFilter" class="filter-select" aria-label="Filter by country">
+            <option value="All">All</option>
+            <option value="United States">United States</option>
+            <option value="Mexico">Mexico</option>
+            <option value="Canada">Canada</option>
+            <option value="Multilateral">Multilateral</option>
+          </select>
+        </label>
         <div class="sort-toggle glass" role="group" aria-label="Sort order">
           <button type="button" class="sort-btn is-active" data-sort="score">Signal</button>
           <button type="button" class="sort-btn" data-sort="date">Newest</button>
         </div>
       </div>
 
-      <div class="tracker-body">
-        <div class="tracker-main">
-          <p class="result-count" id="resultCount"></p>
-          <section class="feed" id="feed" aria-live="polite"></section>
-          <p class="empty-state" id="emptyState" hidden>No dispatches match these filters.</p>
-          <footer class="dash-footer">
-            <p>Sources: Federal Register API &middot; Google News (Boolean queries + <code>site:</code> feeds) &middot; USTR &middot; Global Affairs Canada &middot; Diario Oficial de la Federaci&oacute;n &middot; CSIS &middot; Rethink Trade &middot; Inside U.S. Trade (headlines).</p>
-            <p>This is a monitoring aid, not a source of truth &mdash; open the linked primary document before acting on anything here.</p>
-          </footer>
-        </div>
-
-        <aside class="signal-rail glass" aria-label="Minimum signal filter">
-          <span class="rail-label">Min<br>Signal</span>
-          <div class="slider-wrap">
-            <input type="range" id="scoreSlider" min="0" max="14" step="1" value="0" aria-label="Minimum signal">
-          </div>
-          <output id="scoreSliderVal" class="rail-value" for="scoreSlider">0</output>
-        </aside>
+      <div class="tracker-main">
+        <p class="result-count" id="resultCount"></p>
+        <section class="feed" id="feed" aria-live="polite"></section>
+        <p class="empty-state" id="emptyState" hidden>No dispatches match these filters.</p>
+        <footer class="dash-footer">
+          <p>Sources: Federal Register API &middot; Google News (Boolean queries + <code>site:</code> feeds) &middot; USTR &middot; Global Affairs Canada &middot; Diario Oficial de la Federaci&oacute;n &middot; CSIS &middot; Rethink Trade &middot; Inside U.S. Trade (headlines).</p>
+          <p>This is a monitoring aid, not a source of truth &mdash; open the linked primary document before acting on anything here.</p>
+        </footer>
       </div>
+
+      <aside class="signal-rail glass" aria-label="Minimum signal filter">
+        <span class="rail-label">Min<br>Signal</span>
+        <div class="slider-wrap">
+          <input type="range" id="scoreSlider" min="0" max="14" step="1" value="0" aria-label="Minimum signal">
+        </div>
+        <output id="scoreSliderVal" class="rail-value" for="scoreSlider">0</output>
+      </aside>
+
+      <button type="button" id="scrollTopBtn" class="scroll-top-btn glass" aria-label="Back to top" hidden>&uarr;</button>
     </div>
   </section>
 </div>
@@ -656,6 +693,15 @@ TEMPLATE = r"""<meta charset="utf-8">
   };
 
   function groupLabel(item) { return item.group; }
+
+  const US_GROUPS = new Set(["USTR (official)", "Inside U.S. Trade", "CSIS", "Rethink Trade"]);
+  function countryOf(item) {
+    if (item.origin === "federal_register" || item.origin === "congress") return "United States";
+    if (US_GROUPS.has(item.group)) return "United States";
+    if (item.group === "Global Affairs Canada") return "Canada";
+    if (/diario oficial/i.test(item.group)) return "Mexico";
+    return "Multilateral";
+  }
 
   function computeStats() {
     document.getElementById("itemCount").textContent = DATA.length;
@@ -704,31 +750,17 @@ TEMPLATE = r"""<meta charset="utf-8">
     });
   }
 
-  function buildChips() {
+  function buildFilters() {
     const counts = {};
-    const originOf = {};
-    DATA.forEach(d => {
-      const g = groupLabel(d);
-      counts[g] = (counts[g] || 0) + 1;
-      originOf[g] = d.origin;
-    });
-    const originColor = { federal_register: "var(--comp-fedreg)", google_news: "var(--comp-gnews)", site_feed: "var(--comp-site)", congress: "var(--comp-congress)" };
+    DATA.forEach(d => { const g = groupLabel(d); counts[g] = (counts[g] || 0) + 1; });
     const groups = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    const wrap = document.getElementById("sourceChips");
+    const sel = document.getElementById("sourceFilter");
     groups.forEach(g => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "chip is-active";
-      btn.dataset.group = g;
-      btn.style.setProperty("--chip-color", originColor[originOf[g]] || "var(--ink-muted)");
-      btn.innerHTML = `<span class="chip-dot"></span>${escapeHtml(g)} <span class="chip-count">${counts[g]}</span>`;
-      btn.addEventListener("click", () => {
-        btn.classList.toggle("is-active");
-        render();
-      });
-      wrap.appendChild(btn);
+      const opt = document.createElement("option");
+      opt.value = g;
+      opt.textContent = `${g} (${counts[g]})`;
+      sel.appendChild(opt);
     });
-    return groups;
   }
 
   function escapeHtml(s) {
@@ -777,15 +809,13 @@ TEMPLATE = r"""<meta charset="utf-8">
       </article>`;
   }
 
-  let state = { query: "", minScore: 0, sort: "score" };
+  let state = { query: "", minScore: 0, sort: "score", source: "All", country: "All" };
 
   function render() {
-    const activeGroups = new Set(
-      Array.from(document.querySelectorAll("#sourceChips .chip.is-active")).map(b => b.dataset.group)
-    );
     const q = state.query.trim().toLowerCase();
     let filtered = DATA.filter(d => {
-      if (!activeGroups.has(groupLabel(d))) return false;
+      if (state.source !== "All" && groupLabel(d) !== state.source) return false;
+      if (state.country !== "All" && countryOf(d) !== state.country) return false;
       if (d.score < state.minScore) return false;
       if (q && !(`${d.title} ${d.summary}`.toLowerCase().includes(q))) return false;
       return true;
@@ -812,14 +842,8 @@ TEMPLATE = r"""<meta charset="utf-8">
     const isWelcome = name === "welcome";
     document.getElementById("panel-welcome").hidden = !isWelcome;
     document.getElementById("panel-tracker").hidden = isWelcome;
-    document.querySelectorAll(".tab-btn").forEach(b => {
-      const active = b.dataset.tab === name;
-      b.classList.toggle("is-active", active);
-      b.setAttribute("aria-selected", String(active));
-    });
-    const indicator = document.querySelector(".tab-indicator");
-    if (indicator) indicator.style.transform = isWelcome ? "translateX(0%)" : "translateX(100%)";
     try { localStorage.setItem("usmca-tab", name); } catch (e) {}
+    if (!isWelcome) { window.scrollTo(0, 0); updateTopbarFade(); updateScrollTopBtn(); }
   }
 
   function updateThumbColor(slider) {
@@ -831,9 +855,24 @@ TEMPLATE = r"""<meta charset="utf-8">
     slider.style.setProperty("--thumb-color", `rgb(${r},${g},${b})`);
   }
 
+  function updateTopbarFade() {
+    const topbar = document.getElementById("trackerTopbar");
+    if (!topbar || document.getElementById("panel-tracker").hidden) return;
+    const fadeDistance = 180;
+    const ratio = Math.max(0, Math.min(1, 1 - window.scrollY / fadeDistance));
+    topbar.style.opacity = String(ratio);
+    topbar.style.pointerEvents = ratio < 0.05 ? "none" : "auto";
+  }
+
+  function updateScrollTopBtn() {
+    const btn = document.getElementById("scrollTopBtn");
+    if (!btn || document.getElementById("panel-tracker").hidden) return;
+    btn.classList.toggle("is-visible", window.scrollY > 480);
+  }
+
   function init() {
     computeStats();
-    buildChips();
+    buildFilters();
 
     const maxScore = Math.max(0, ...DATA.map(d => d.score));
     const slider = document.getElementById("scoreSlider");
@@ -853,6 +892,15 @@ TEMPLATE = r"""<meta charset="utf-8">
       debounce = setTimeout(() => { state.query = val; render(); }, 120);
     });
 
+    document.getElementById("sourceFilter").addEventListener("change", e => {
+      state.source = e.target.value;
+      render();
+    });
+    document.getElementById("countryFilter").addEventListener("change", e => {
+      state.country = e.target.value;
+      render();
+    });
+
     document.querySelectorAll(".sort-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll(".sort-btn").forEach(b => b.classList.remove("is-active"));
@@ -862,11 +910,17 @@ TEMPLATE = r"""<meta charset="utf-8">
       });
     });
 
-    document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
     document.getElementById("openTrackerBtn").addEventListener("click", () => setTab("tracker"));
+    document.getElementById("backToWelcomeBtn").addEventListener("click", () => setTab("welcome"));
     let initialTab = "welcome";
     try { initialTab = localStorage.getItem("usmca-tab") || "welcome"; } catch (e) {}
     setTab(initialTab);
+
+    window.addEventListener("scroll", () => { updateTopbarFade(); updateScrollTopBtn(); }, { passive: true });
+    document.getElementById("scrollTopBtn").addEventListener("click", () => {
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+    });
 
     const refreshBtn = document.getElementById("refreshBtn");
     const refreshStatus = document.getElementById("refreshStatus");
