@@ -147,7 +147,6 @@ TEMPLATE = r"""<meta charset="utf-8">
     display: block;
     position: relative;
     min-height: 100%;
-    background: var(--page-base);
   }
   @media (prefers-color-scheme: dark) {
     #dash:not([data-theme-lock]) {
@@ -223,7 +222,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   }
 
   /* ambient flag-colored wash, fixed behind everything */
-  #dash .bg-wash { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  #dash .bg-wash { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--page-base); }
   #dash .bg-wash span { position: absolute; border-radius: 50%; filter: blur(64px); opacity: var(--wash-opacity); }
   #dash .bg-wash span:nth-child(1) { width: 48vw; height: 48vw; top: -14%; left: -10%; background: var(--wash-blue); animation: blobDriftA 34s ease-in-out infinite alternate; }
   #dash .bg-wash span:nth-child(2) { width: 40vw; height: 40vw; top: -8%; right: -12%; background: var(--wash-red); animation: blobDriftB 27s ease-in-out infinite alternate; }
@@ -445,10 +444,10 @@ TEMPLATE = r"""<meta charset="utf-8">
     font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--ink-muted); text-align: center; line-height: 1.35;
   }
-  #dash .slider-wrap { position: relative; width: 40px; flex: 1; display: flex; align-items: center; justify-content: center; }
+  #dash .slider-wrap { position: relative; width: 40px; height: 260px; display: flex; align-items: center; justify-content: center; }
   #dash #scoreSlider {
     position: absolute; top: 50%; left: 50%;
-    width: min(70vh, 640px); height: 40px;
+    width: 260px; height: 40px;
     transform: translate(-50%, -50%) rotate(-90deg);
     -webkit-appearance: none; appearance: none;
     background: transparent; margin: 0; cursor: pointer;
