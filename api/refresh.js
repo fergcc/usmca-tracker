@@ -58,6 +58,8 @@ export default async function handler(req, res) {
     if (dispatchRes.status === 204) {
       res.status(202).json({ status: "queued" });
     } else {
+      const body = await dispatchRes.text();
+      console.error("dispatch failed", dispatchRes.status, body);
       res.status(502).json({ error: "dispatch_failed" });
     }
   } catch {
