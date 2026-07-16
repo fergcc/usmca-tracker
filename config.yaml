@@ -1,0 +1,125 @@
+# USMCA Tracker configuration.
+# Everything here overrides the built-in defaults. Delete any block to fall
+# back to the default. Tune the keyword lists and queries freely.
+
+notifications:
+  desktop: true          # macOS banner (osascript). Ignored on non-Mac.
+  log_markdown: true     # dated brief in ./briefings/
+  log_jsonl: true        # append-only machine log ./data/items.jsonl
+  email:
+    enabled: false       # flip to true and fill in to get email pings
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    username: "jj@scientika.mx"
+    # NEVER put a password here. Export it in your shell / launchd instead:
+    #   export USMCA_SMTP_PASSWORD="your-app-password"
+    password_env: "USMCA_SMTP_PASSWORD"
+    from: "jj@scientika.mx"
+    to: ["jj@scientika.mx"]
+    min_score: 3         # only email items scoring >= this (keeps inbox clean)
+
+scoring:
+  critical:              # +3 each — structural / procedural signals
+    - "joint review"
+    - "annual review"
+    - "sunset"
+    - "concludes"
+    - "concluded"
+    - "third round"
+    - "fourth round"
+    - "public comment"
+    - "comment period"
+    - "signed"
+    - "notice"
+    - "tariff"
+    - "rules of origin"
+    - "termination"
+    - "withdraw"
+    - "renewal"
+    - "legal text"
+    - "text-based"
+  players:               # +2 each — the human-intel layer
+    - "Greer"
+    - "Ebrard"
+    - "Carney"
+    - "Sidhu"
+    - "Goettman"
+    - "Sheinbaum"
+  sectors:               # +1 each — issue tables
+    - "EV"
+    - "BYD"
+    - "battery"
+    - "automotive"
+    - "steel"
+    - "aluminum"
+    - "dairy"
+    - "biotech corn"
+    - "energy"
+    - "circumvention"
+    - "nearshoring"
+    - "china"
+    - "chinese"
+
+queries:
+  macro:
+    label: "Macro & Geopolitical Review"
+    google_news: '("USMCA" OR "CUSMA" OR "T-MEC") ("joint review" OR sunset OR "annual review" OR Greer OR Ebrard OR Carney)'
+    boolean: '("USMCA" OR "CUSMA" OR "T-MEC") AND ("joint review" OR "sunset" OR "annual review" OR "Greer" OR "Ebrard" OR "Carney")'
+  roundtables:
+    label: "Bilateral Roundtables (Sectoral Friction)"
+    google_news: '("USMCA" OR "T-MEC" OR "CUSMA") ("rules of origin" OR "rapid response" OR "biotech corn" OR dairy OR steel OR aluminum)'
+    boolean: '("USMCA" OR "T-MEC" OR "CUSMA") AND ("rules of origin" OR "rapid response labor" OR "biotech corn" OR "dairy tariffs" OR "steel" OR "aluminum")'
+  china:
+    label: "China Circumvention & Nearshoring"
+    google_news: '("USMCA" OR "T-MEC") (China OR EV OR BYD OR circumvention OR nearshoring)'
+    boolean: '("USMCA" OR "T-MEC") AND ("China" OR "EV" OR "byd" OR "circumvention" OR "nearshoring")'
+
+site_feeds:
+  - label: "Inside U.S. Trade (headlines only – full text = your login)"
+    query: 'USMCA OR "T-MEC" site:insidetrade.com'
+  - label: "CSIS"
+    query: 'USMCA OR "joint review" site:csis.org'
+  - label: "Rethink Trade"
+    query: 'USMCA OR "T-MEC" site:rethinktrade.org'
+  - label: "USTR (official)"
+    query: 'USMCA site:ustr.gov'
+  - label: "Diario Oficial de la Federación (MX)"
+    query: 'T-MEC OR USMCA site:dof.gob.mx'
+  - label: "Global Affairs Canada"
+    query: 'CUSMA OR USMCA site:international.gc.ca'
+
+federal_register:
+  enabled: true
+  per_page: 20
+  terms:
+    - "USMCA"
+    - "United States-Mexico-Canada Agreement"
+    - "rules of origin automotive"
+
+# Congress.gov: free API, requires a key from https://api.congress.gov/sign-up/.
+# NEVER put the key here. Export it instead:
+#   export CONGRESS_API_KEY="your-key"
+# The API has no full-text search, so this pulls the most recently updated
+# bills (across all current committees) and filters locally by title match
+# against `terms` below.
+congress:
+  enabled: true
+  per_page: 250
+  max_pages: 80
+  api_key_env: "CONGRESS_API_KEY"
+  terms:
+    - "USMCA"
+    - "United States-Mexico-Canada Agreement"
+    - "CUSMA"
+    - "T-MEC"
+
+match:
+  require_any:
+    - "USMCA"
+    - "CUSMA"
+    - "T-MEC"
+    - "United States-Mexico-Canada"
+
+limits:
+  max_items_per_source: 40
+  http_timeout_seconds: 25

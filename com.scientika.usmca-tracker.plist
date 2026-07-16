@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS launchd job: runs the tracker every 15 minutes (near-real-time).
+  1. Edit the two REPLACE_ME paths below to your actual folder & python.
+  2. Copy to  ~/Library/LaunchAgents/com.scientika.usmca-tracker.plist
+  3. Load it:  launchctl load ~/Library/LaunchAgents/com.scientika.usmca-tracker.plist
+     Unload:   launchctl unload ~/Library/LaunchAgents/com.scientika.usmca-tracker.plist
+  Tip: run `which python3` to get the python path for ProgramArguments[0].
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scientika.usmca-tracker</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>REPLACE_ME/usmca-tracker/usmca_tracker.py</string>
+        <string>--config</string>
+        <string>REPLACE_ME/usmca-tracker/config.yaml</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>REPLACE_ME/usmca-tracker</string>
+
+    <!-- Poll every 900 seconds = 15 min. Lower for faster, higher for calmer. -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <!-- Also run once at load so you get an immediate first pull. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- launchd has a bare environment, so any key the script reads via
+         os.environ must be set here. CONGRESS_API_KEY is required for the
+         Congress.gov source (get one free at api.congress.gov/sign-up);
+         USMCA_SMTP_PASSWORD is only needed if you enable email in config.yaml.
+         Fill in real values and uncomment: -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CONGRESS_API_KEY</key>
+        <string>your-congress-api-key</string>
+        <key>USMCA_SMTP_PASSWORD</key>
+        <string>your-app-password</string>
+    </dict>
+    -->
+
+    <key>StandardOutPath</key>
+    <string>REPLACE_ME/usmca-tracker/data/tracker.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>REPLACE_ME/usmca-tracker/data/tracker.err.log</string>
+</dict>
+</plist>

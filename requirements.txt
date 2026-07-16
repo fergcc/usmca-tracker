@@ -1,0 +1,5 @@
+# USMCA Tracker dependencies.
+# The script degrades gracefully without these, but installing them makes
+# feed parsing far more robust and lets you use the YAML config.
+feedparser>=6.0.11
+PyYAML>=6.0.1
