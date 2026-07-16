@@ -379,6 +379,16 @@
     border-radius: 10px; padding: 0.2rem 0.55rem; min-width: 2.1rem; text-align: center;
   }
 
+  /* ---------- theme toggle ---------- */
+  #dash .theme-toggle {
+    position: fixed; top: 16px; right: 24px; z-index: 40;
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: var(--ink-soft); cursor: pointer; border: none;
+  }
+  #dash .theme-toggle:hover { color: var(--accent); }
+  #dash .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   /* ---------- scroll-to-top ---------- */
   #dash .scroll-top-btn {
     position: fixed; left: 24px; bottom: 24px; z-index: 30;
@@ -477,6 +487,7 @@
 <div class="dash" id="dash">
   <div class="bg-wash" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
   <a class="skip-link" href="#feed">Skip to dispatches</a>
+  <button type="button" id="themeToggleBtn" class="theme-toggle glass" aria-label="Toggle dark mode">&#9728;</button>
 
   <section id="panel-welcome" class="panel panel-welcome" role="region" aria-label="Welcome">
     <div class="welcome-card glass">
@@ -501,7 +512,7 @@
 
   <section id="panel-tracker" class="panel panel-tracker" role="region" aria-label="Tracker" hidden>
     <div class="tracker-inner">
-      <p class="tracker-meta">Generated July 16, 2026 &middot; 2:05 PM &middot; <span id="rangeText">&mdash;</span></p>
+      <p class="tracker-meta">Generated July 16, 2026 &middot; 2:11 PM &middot; <span id="rangeText">&mdash;</span></p>
 
       <div class="tracker-topbar glass" id="trackerTopbar">
         <button type="button" class="back-btn" id="backToWelcomeBtn" aria-label="Back to Welcome">&larr;</button>
@@ -780,7 +791,25 @@
     btn.classList.toggle("is-visible", window.scrollY > 480);
   }
 
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("usmca-theme", theme); } catch (e) {}
+    const btn = document.getElementById("themeToggleBtn");
+    if (btn) btn.innerHTML = theme === "dark" ? "&#9789;" : "&#9728;";
+  }
+
   function init() {
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem("usmca-theme"); } catch (e) {}
+    if (!savedTheme) {
+      savedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    applyTheme(savedTheme);
+    document.getElementById("themeToggleBtn").addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      applyTheme(current === "dark" ? "light" : "dark");
+    });
+
     computeStats();
     buildFilters();
 

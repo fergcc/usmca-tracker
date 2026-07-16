@@ -482,6 +482,16 @@ TEMPLATE = r"""<meta charset="utf-8">
     border-radius: 10px; padding: 0.2rem 0.55rem; min-width: 2.1rem; text-align: center;
   }
 
+  /* ---------- theme toggle ---------- */
+  #dash .theme-toggle {
+    position: fixed; top: 16px; right: 24px; z-index: 40;
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: var(--ink-soft); cursor: pointer; border: none;
+  }
+  #dash .theme-toggle:hover { color: var(--accent); }
+  #dash .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   /* ---------- scroll-to-top ---------- */
   #dash .scroll-top-btn {
     position: fixed; left: 24px; bottom: 24px; z-index: 30;
@@ -580,6 +590,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 <div class="dash" id="dash">
   <div class="bg-wash" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
   <a class="skip-link" href="#feed">Skip to dispatches</a>
+  <button type="button" id="themeToggleBtn" class="theme-toggle glass" aria-label="Toggle dark mode">&#9728;</button>
 
   <section id="panel-welcome" class="panel panel-welcome" role="region" aria-label="Welcome">
     <div class="welcome-card glass">
@@ -883,7 +894,25 @@ TEMPLATE = r"""<meta charset="utf-8">
     btn.classList.toggle("is-visible", window.scrollY > 480);
   }
 
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("usmca-theme", theme); } catch (e) {}
+    const btn = document.getElementById("themeToggleBtn");
+    if (btn) btn.innerHTML = theme === "dark" ? "&#9789;" : "&#9728;";
+  }
+
   function init() {
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem("usmca-theme"); } catch (e) {}
+    if (!savedTheme) {
+      savedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    applyTheme(savedTheme);
+    document.getElementById("themeToggleBtn").addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      applyTheme(current === "dark" ? "light" : "dark");
+    });
+
     computeStats();
     buildFilters();
 
