@@ -59,6 +59,14 @@ jobs:
           path: data
           key: usmca-data-${{ github.run_id }}
 
+      - name: Run TMEC Engine (search + AI enrich)
+        env:
+          SEARCH_API_KEY: ${{ secrets.SEARCH_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          python3 -m pip install -r Engine/requirements.txt
+          python3 -m Engine.engine run
+
       - name: Rebuild dashboard
         run: python3 build_dashboard.py
 

@@ -1,0 +1,79 @@
+# TMEC Intelligence Engine configuration.
+# Secrets must come from environment variables — never hardcoded here.
+
+deepseek:
+  model: "deepseek-chat"
+  temperature: 0.3
+  max_tokens: 600
+  base_url_env: "DEEPSEEK_BASE_URL"
+  api_key_env: "DEEPSEEK_API_KEY"
+
+  prompts:
+    summarize:
+      system: "Eres un analista de inteligencia comercial especializado en el T-MEC/USMCA/CUSMA. Responde siempre en español."
+      user: |
+        Resume el siguiente artículo sobre el T-MEC en exactamente 2-3 oraciones en español.
+        Enfócate en lo más relevante para el acuerdo comercial: decisiones, plazos, fricciones, actores clave y sectores afectados.
+        No incluyas frases como \"El artículo trata sobre...\". Ve directo al contenido.
+
+        Artículo:
+        {text}
+
+    sentiment:
+      system: "Eres un analista de inteligencia comercial. Responde EXACTAMENTE una sola palabra, sin puntuación ni explicación adicional."
+      user: |
+        Clasifica el sentimiento general de este artículo hacia el futuro del T-MEC.
+        Responde ÚNICAMENTE con una de estas tres palabras: positive, negative, neutral.
+
+        Artículo:
+        {text}
+
+    entities:
+      system: "Eres un analista de inteligencia comercial. Responde en español, formato estricto."
+      user: |
+        Extrae del siguiente artículo los jugadores clave, sectores económicos y países mencionados en el contexto del T-MEC.
+        Usa EXACTAMENTE este formato, una entidad por línea:
+        @nombre_del_jugador
+        #sector_economico
+
+        Solo incluye entidades directamente relevantes al T-MEC. Máximo 8 entidades en total.
+        Si no encuentras ninguna, responde: NONE
+
+        Artículo:
+        {text}
+
+    impact:
+      system: "Eres un analista de inteligencia comercial. Responde en español, formato estricto."
+      user: |
+        Evalúa el impacto potencial de este artículo sobre el T-MEC en una escala de 1 (irrelevante) a 10 (disruptivo/crítico).
+        Responde EXACTAMENTE en este formato, una sola línea:
+        SCORE|RAZÓN BREVE (máximo 120 caracteres)
+
+        Artículo:
+        {text}
+
+search_api:
+  api_key_env: "SEARCH_API_KEY"
+  base_url: "https://www.searchapi.io/api/v1/search"
+  timeout_seconds: 25
+  max_results_per_query: 10
+
+  queries:
+    macro:
+      label: "Macro & Geopolitical Review"
+      q: '"USMCA" OR "CUSMA" OR "T-MEC" "joint review" OR sunset OR Greer OR Ebrard OR Carney'
+    sectoral:
+      label: "Sectoral Friction & Rules of Origin"
+      q: '"USMCA" OR "T-MEC" "rules of origin" OR automotive OR steel OR aluminum OR dairy OR "biotech corn"'
+    china:
+      label: "China Circumvention & Nearshoring"
+      q: '"USMCA" OR "T-MEC" China OR EV OR BYD OR circumvention OR nearshoring'
+    trade_policy:
+      label: "Trade Policy & Tariffs"
+      q: '"USMCA" OR "T-MEC" tariff OR "trade policy" OR USTR OR "rapid response"'
+
+limits:
+  max_concurrent_deepseek: 3
+  max_retries: 3
+  retry_delay_seconds: 5
+  max_tokens_for_analysis: 4000

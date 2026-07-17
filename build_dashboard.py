@@ -61,6 +61,10 @@ def prep(it: dict) -> dict:
     )
     ts, disp = parse_published(it.get("published", ""))
     is_paywalled = it["source"].startswith("Inside U.S. Trade")
+    ai_summary = clean(it.get("aiSummary", ""))
+    sentiment = (it.get("sentiment") or "").lower().strip()
+    if sentiment not in ("positive", "negative", "neutral"):
+        sentiment = ""
     return {
         "title": title,
         "url": it["url"],
@@ -74,12 +78,21 @@ def prep(it: dict) -> dict:
         "tags": it.get("tags", []),
         "paywalled": is_paywalled,
         "image": it.get("image_url", ""),
+        "aiSummary": ai_summary,
+        "sentiment": sentiment,
+        "impactScore": it.get("impactScore", 0),
+        "impactReason": clean(it.get("impactReason", "")),
+        "aiEntities": it.get("aiEntities", []),
     }
 
 
 def main():
+    enriched_path = PROJECT / "data" / "items_enriched.jsonl"
+    source_path = enriched_path if enriched_path.exists() else ITEMS_PATH
+    if enriched_path.exists():
+        print(f"Using enriched data: {enriched_path}")
     raw_items = []
-    with ITEMS_PATH.open(encoding="utf-8") as f:
+    with source_path.open(encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -568,6 +581,55 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .card-link { display: inline-block; margin-top: 0.6rem; font-size: 0.78rem; font-weight: 600; text-decoration: none; }
   #dash .card-link:hover { text-decoration: underline; }
 
+  /* ---------- AI enrichment elements ---------- */
+  #dash .sentiment-badge {
+    display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+    border-radius: 4px; padding: 0.12rem 0.48rem; margin-left: 0.4rem; vertical-align: middle;
+    text-transform: uppercase;
+  }
+  #dash .sentiment-badge--positive { color: #1b7a3d; background: rgba(27,122,61,0.14); }
+  #dash .sentiment-badge--negative { color: #c23a2e; background: var(--sig-critical-bg); }
+  #dash .sentiment-badge--neutral  { color: #5f6672; background: var(--hairline); }
+
+  #dash .impact-badge {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.7rem; font-weight: 700; color: var(--sig-notable);
+    background: var(--sig-notable-bg); border-radius: 4px;
+    padding: 0.14rem 0.48rem; margin-left: 0.4rem; vertical-align: middle;
+    cursor: help;
+  }
+
+  #dash .ai-summary {
+    margin: 0.55rem 0 0; font-size: 0.84rem; color: var(--ink-soft); line-height: 1.5;
+  }
+  #dash .ai-summary summary {
+    cursor: pointer; font-weight: 600; font-size: 0.78rem; color: var(--accent);
+    letter-spacing: 0.03em; text-transform: uppercase;
+    list-style: none; display: flex; align-items: center; gap: 0.35rem;
+  }
+  #dash .ai-summary summary::-webkit-details-marker { display: none; }
+  #dash .ai-summary summary::before {
+    content: "▸"; display: inline-block; font-size: 0.65rem; transition: transform 0.2s ease;
+  }
+  #dash .ai-summary[open] summary::before { transform: rotate(90deg); }
+  #dash .ai-summary p { margin: 0.4rem 0 0; padding: 0.5rem 0.65rem; background: var(--accent-soft); border-radius: 8px; border-left: 3px solid var(--accent); }
+
+  #dash .ai-entities-row {
+    margin: 0.45rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem;
+  }
+  #dash .ai-tag {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.66rem; padding: 0.1rem 0.38rem; border-radius: 4px;
+    background: rgba(126,166,232,0.12); color: var(--accent);
+    border: 1px solid rgba(126,166,232,0.2);
+  }
+
+  #dash .card-footer-row {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--hairline);
+  }
+
   #dash .dash-footer { margin: 2.25rem 0 0; padding: 1.1rem 0 0; border-top: 1px solid var(--hairline); font-size: 0.76rem; color: var(--ink-muted); line-height: 1.6; }
   #dash .dash-footer p { margin: 0 0 0.4rem; }
   #dash .dash-footer code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
@@ -803,10 +865,25 @@ TEMPLATE = r"""<meta charset="utf-8">
   }
 
   function renderCard(item) {
-    const tagsHtml = (item.tags || []).length
-      ? `<div class="tag-row">${item.tags.map(t => `<span class="${tagClass(t)}">${escapeHtml(t)}</span>`).join("")}</div>`
+    const allTags = [...(item.tags || []), ...(item.aiEntities || [])];
+    const allTagsHtml = allTags.length
+      ? `<div class="tag-row">${allTags.map(t => {
+          if (item.aiEntities && item.aiEntities.includes(t)) {
+            return `<span class="ai-tag">${escapeHtml(t)}</span>`;
+          }
+          return `<span class="${tagClass(t)}">${escapeHtml(t)}</span>`;
+        }).join("")}</div>`
       : "";
     const summaryHtml = item.summary ? `<p class="card-summary">${escapeHtml(item.summary)}</p>` : "";
+    const aiSummaryHtml = item.aiSummary
+      ? `<details class="ai-summary"><summary>AI Summary</summary><p>${escapeHtml(item.aiSummary)}</p></details>`
+      : "";
+    const sentimentHtml = item.sentiment
+      ? `<span class="sentiment-badge sentiment-badge--${escapeHtml(item.sentiment)}">${escapeHtml(item.sentiment)}</span>`
+      : "";
+    const impactHtml = item.impactScore
+      ? `<span class="impact-badge" title="${escapeHtml(item.impactReason || '')}">⚡ ${item.impactScore}/10</span>`
+      : "";
     const lockBadge = item.paywalled ? `<span class="lock-badge">headlines only</span>` : "";
     const dateHtml = item.publishedDisplay ? `<span class="dot">&middot;</span><time>${escapeHtml(item.publishedDisplay)}</time>` : "";
     const imgHtml = item.image
@@ -822,11 +899,12 @@ TEMPLATE = r"""<meta charset="utf-8">
             <span class="score-badge" style="--stamp-rot:${rot}deg">${item.score}</span>
             <div class="card-heading">
               <a class="card-title" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${lockBadge}${dateHtml}</p>
+              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${lockBadge}${sentimentHtml}${impactHtml}${dateHtml}</p>
             </div>
           </div>
-          ${tagsHtml}
+          ${allTagsHtml}
           ${summaryHtml}
+          ${aiSummaryHtml}
           <a class="card-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Open source &#8599;</a>
         </div>
       </article>`;

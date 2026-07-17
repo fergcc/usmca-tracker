@@ -6,3 +6,7 @@ briefings/
 .env
 .vercel
 .env*
+Engine/__pycache__/
+Engine/.env
+Engine/.venv/
+Engine/*.pyc
