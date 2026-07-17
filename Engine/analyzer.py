@@ -21,16 +21,6 @@ def _load_prompts(config_path: str | None = None) -> dict[str, Any]:
 
 
 class Analyzer:
-    """Runs the AI analysis pipeline on one or more articles.
-
-    Each article gets:
-      - aiSummary: 2-3 sentence summary in Spanish
-      - sentiment: 'positive', 'negative', or 'neutral'
-      - impactScore: 1-10 integer
-      - impactReason: short justification string
-      - aiEntities: list of "@name" / "#sector" tags
-    """
-
     def __init__(
         self,
         deepseek: DeepSeekClient | None = None,
@@ -41,14 +31,11 @@ class Analyzer:
         limits = cfg.get("limits", {})
 
         if deepseek is None:
-            deepseek = DeepSeekClient(
-                model=ds_cfg.get("model", "deepseek-chat"),
-            )
+            deepseek = DeepSeekClient(model=ds_cfg.get("model", "deepseek-chat"))
         self.deepseek = deepseek
         self.prompts = ds_cfg.get("prompts", {})
         self.max_retries = limits.get("max_retries", 3)
         self.retry_delay = limits.get("retry_delay_seconds", 5)
-        self.max_concurrent = limits.get("max_concurrent_deepseek", 3)
         self.max_tokens_for_analysis = limits.get("max_tokens_for_analysis", 4000)
 
     def _truncate(self, text: str) -> str:
@@ -66,9 +53,11 @@ class Analyzer:
             ("sentiment", "sentiment", self._run_sentiment),
             ("entities", "entities", self._run_entities),
             ("impact", "impact", self._run_impact),
+            ("stance", "stance", self._run_stance),
+            ("tension", "tension", self._run_tension),
         ]
 
-        for _key, prompt_key, fn in tasks:
+        for prompt_key, _internal_key, fn in tasks:
             prompt_cfg = self.prompts.get(prompt_key, {})
             if not prompt_cfg:
                 continue
@@ -137,15 +126,50 @@ class Analyzer:
             except Exception:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
-        return {"impactScore": 1, "impactReason": ""}
+        return {"impactScore": 0, "impactReason": ""}
+
+    def _run_stance(self, text: str, prompt_cfg: dict[str, str]) -> dict[str, str]:
+        for attempt in range(self.max_retries):
+            try:
+                stance = self.deepseek.assess_stance(
+                    text,
+                    system_prompt=prompt_cfg.get("system", ""),
+                    user_prompt=prompt_cfg.get("user", ""),
+                )
+                return {"stance": stance}
+            except Exception:
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay)
+        return {"stance": "MULTI"}
+
+    def _run_tension(self, text: str, prompt_cfg: dict[str, str]) -> dict[str, Any] | None:
+        for attempt in range(self.max_retries):
+            try:
+                result = self.deepseek.assess_tension(
+                    text,
+                    system_prompt=prompt_cfg.get("system", ""),
+                    user_prompt=prompt_cfg.get("user", ""),
+                )
+                if result is None:
+                    return None
+                origin, target, score, reason = result
+                return {
+                    "tensionOrigin": origin,
+                    "tensionTarget": target,
+                    "tensionScore": score,
+                    "tensionReason": reason,
+                }
+            except Exception:
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay)
+        return None
 
     def analyze_batch(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        enriched: list[dict[str, Any]] = []
         total = len(articles)
         for i, article in enumerate(articles, 1):
-            print(f"  [analyzer] Article {i}/{total}: {article.get('title', '?')[:80]}...")
+            title_preview = (article.get("title", "?") or "?")[:80]
+            print(f"  [analyzer] Article {i}/{total}: {title_preview}...")
             ai_data = self.analyze_article(article)
             article.update(ai_data)
-            enriched.append(article)
             time.sleep(0.6)
-        return enriched
+        return articles

@@ -1,10 +1,10 @@
-# TMEC Intelligence Engine configuration.
+# TMEC Intelligence Engine v2.0 configuration.
 # Secrets must come from environment variables — never hardcoded here.
 
 deepseek:
   model: "deepseek-chat"
   temperature: 0.3
-  max_tokens: 600
+  max_tokens: 900
   base_url_env: "DEEPSEEK_BASE_URL"
   api_key_env: "DEEPSEEK_API_KEY"
 
@@ -35,23 +35,256 @@ deepseek:
         Usa EXACTAMENTE este formato, una entidad por línea:
         @nombre_del_jugador
         #sector_economico
+        +PAIS (uno de: US, MX, CA)
 
-        Solo incluye entidades directamente relevantes al T-MEC. Máximo 8 entidades en total.
+        Solo incluye entidades directamente relevantes al T-MEC. Máximo 10 entidades en total.
         Si no encuentras ninguna, responde: NONE
 
         Artículo:
         {text}
 
     impact:
-      system: "Eres un analista de inteligencia comercial. Responde en español, formato estricto."
+      system: "Eres un analista de inteligencia comercial senior. Evalúas impacto sistémico. Responde en español, formato estricto."
       user: |
-        Evalúa el impacto potencial de este artículo sobre el T-MEC en una escala de 1 (irrelevante) a 10 (disruptivo/crítico).
+        Evalúa el impacto de este artículo sobre el T-MEC en una escala de 0 (irrelevante) a 100 (disruptivo/crítico).
+        Considera estas 5 dimensiones con sus pesos máximos:
+
+        1. RELEVANCIA DIRECTA (0-30): ¿El T-MEC es el tema central?
+        2. URGENCIA TEMPORAL (0-20): ¿Involucra deadlines, fechas límite, vencimientos inminentes?
+        3. ACTORES CLAVE (0-15): ¿Menciona actores de alto perfil? 
+           Tier 1 (15 pts): Trump, Sheinbaum, Carney, Greer, Ebrard
+           Tier 2 (10 pts): Lutnick, Bessent, Hassett, Joly, LeBlanc, De la Fuente, Ramírez de la O
+           Tier 3 (6 pts): Crapo, Wyden, Smith, Neal
+           Tier 4 (3 pts): Lighthizer, Tai, Freeland, Seade
+        4. IMPACTO SECTORIAL (0-15): ¿Afecta sectores estratégicos en la ronda actual?
+           Pesos por sector para esta ronda: automotive=30, steel=25, agriculture=20, china=22, energy=18, labor=15, nearshoring=12, digital=12, pharma=10, environment=8.
+           Ajusta por buzz mediático y relevancia para el país mencionado.
+        5. RIESGO DE DISRUPCIÓN (0-20): ¿Señala ruptura, aranceles, sanciones, colapso de cadenas?
+
         Responde EXACTAMENTE en este formato, una sola línea:
-        SCORE|RAZÓN BREVE (máximo 120 caracteres)
+        SCORE_TOTAL|RAZÓN BREVE (máximo 150 caracteres, resume los factores clave)
 
         Artículo:
         {text}
 
+    stance:
+      system: "Eres un analista de inteligencia comercial. Responde EXACTAMENTE con el formato indicado, sin explicación adicional."
+      user: |
+        ¿Desde la perspectiva de qué país está escrito este artículo?
+        Responde ÚNICAMENTE con una de estas opciones: US, MX, CA, MULTI
+
+        US = perspectiva estadounidense
+        MX = perspectiva mexicana
+        CA = perspectiva canadiense
+        MULTI = multilateral o perspectiva externa (China, UE, etc.)
+
+        Artículo:
+        {text}
+
+    tension:
+      system: "Eres un analista de inteligencia comercial y diplomacia. Responde en español, formato estricto."
+      user: |
+        Analiza si este artículo reporta una declaración de un actor de un país dirigida hacia otro país o actor, y qué tan agresiva/hostil es.
+
+        Escala de tensión 0-100:
+        0-20: Cooperativo (\"trabajaremos juntos\")
+        21-40: Diplomático (\"confiamos en el diálogo\")
+        41-60: Presión (\"esperamos reconsideración\")
+        61-80: Amenaza (\"tomaremos medidas\")
+        81-100: Ruptura (\"inaceptable, no renovaremos\")
+
+        Si NO hay una declaración dirigida de un actor hacia otro, responde: NONE
+
+        Si SÍ la hay, responde EXACTAMENTE en este formato, una sola línea:
+        ORIGEN|DESTINO|SCORE|RAZÓN
+
+        Donde ORIGEN y DESTINO son códigos de país: US, MX, CA
+        SCORE es el número 0-100
+        RAZÓN es una frase breve (máximo 80 caracteres)
+
+        Artículo:
+        {text}
+
+# ----------------------------------------------------------------
+# Scoring configuration
+# ----------------------------------------------------------------
+scoring:
+  current_round: 3
+
+  round_weights:
+    1:
+      automotive: 20
+      steel: 15
+      aluminum: 12
+      china: 25
+      agriculture: 18
+      dairy: 14
+      energy: 12
+      labor: 10
+      nearshoring: 14
+      digital: 10
+      pharma: 5
+      environment: 5
+      critical_minerals: 8
+      aerospace: 7
+      financial: 6
+      textile: 5
+      forestry: 4
+    2:
+      automotive: 25
+      steel: 18
+      aluminum: 14
+      china: 22
+      agriculture: 20
+      dairy: 16
+      energy: 15
+      labor: 12
+      nearshoring: 15
+      digital: 10
+      pharma: 8
+      environment: 8
+      critical_minerals: 10
+      aerospace: 8
+      financial: 7
+      textile: 6
+      forestry: 5
+    3:
+      automotive: 30
+      steel: 25
+      aluminum: 22
+      china: 22
+      agriculture: 20
+      dairy: 18
+      energy: 18
+      labor: 15
+      nearshoring: 12
+      digital: 12
+      pharma: 10
+      environment: 8
+      critical_minerals: 10
+      aerospace: 8
+      financial: 7
+      textile: 6
+      forestry: 5
+    4:
+      automotive: 20
+      steel: 15
+      aluminum: 12
+      china: 18
+      agriculture: 15
+      dairy: 12
+      energy: 15
+      labor: 20
+      nearshoring: 10
+      digital: 15
+      pharma: 12
+      environment: 12
+      critical_minerals: 10
+      aerospace: 8
+      financial: 10
+      textile: 6
+      forestry: 5
+
+  actors:
+    tier_1: { Trump: 35, Sheinbaum: 35, Carney: 35, Greer: 30, Ebrard: 30 }
+    tier_2: { Lutnick: 25, Bessent: 20, Hassett: 20, Joly: 20, LeBlanc: 18, de_la_Fuente: 18, Ramirez_de_la_O: 18 }
+    tier_3: { Crapo: 15, Wyden: 15, Smith: 12, Neal: 12 }
+    tier_4: { Lighthizer: 10, Tai: 8, Freeland: 10, Seade: 8 }
+
+  buzz:
+    enabled: true
+    window_hours: 48
+    baseline_days: 7
+    max_multiplier: 2.0
+    searchapi_scan: false
+
+  country_industry:
+    automotive:
+      US: 95
+      MX: 100
+      CA: 90
+    steel:
+      US: 85
+      MX: 70
+      CA: 60
+    aluminum:
+      US: 80
+      MX: 50
+      CA: 75
+    china:
+      US: 95
+      MX: 80
+      CA: 70
+    agriculture:
+      US: 85
+      MX: 90
+      CA: 80
+    dairy:
+      US: 70
+      MX: 30
+      CA: 95
+    energy:
+      US: 90
+      MX: 85
+      CA: 90
+    labor:
+      US: 75
+      MX: 60
+      CA: 50
+    nearshoring:
+      US: 70
+      MX: 90
+      CA: 65
+    digital:
+      US: 95
+      MX: 50
+      CA: 60
+    pharma:
+      US: 80
+      MX: 40
+      CA: 55
+    environment:
+      US: 60
+      MX: 55
+      CA: 70
+    critical_minerals:
+      US: 60
+      MX: 75
+      CA: 80
+    aerospace:
+      US: 80
+      MX: 65
+      CA: 70
+    financial:
+      US: 75
+      MX: 50
+      CA: 65
+    textile:
+      US: 40
+      MX: 70
+      CA: 30
+    forestry:
+      US: 45
+      MX: 30
+      CA: 85
+
+  source_trust:
+    official: { score: 100, domains: [ustr.gov, economy.gob.mx, international.gc.ca, federalregister.gov, congress.gov, whitehouse.gov, state.gov, dof.gob.mx, pm.gc.ca] }
+    elite_press: { score: 90, domains: [bloomberg.com, reuters.com, ft.com, wsj.com, nytimes.com, washingtonpost.com, economist.com] }
+    trade_press: { score: 85, domains: [insidetrade.com, politico.com, law360.com, amlaw.com] }
+    think_tank: { score: 75, domains: [csis.org, brookings.edu, atlanticcouncil.org, americasquarterly.org, bakerinstitute.org, cfr.org, piie.com, wilsoncenter.org, as-coa.org] }
+    general_press: { score: 65, domains: [apnews.com, usatoday.com, thestar.com, eluniversal.com.mx, elfinanciero.com.mx, cbc.ca, theglobeandmail.com, aljazeera.com, bbc.com, newsweek.com, thehill.com, dallasnews.com, chron.com] }
+    industry: { score: 60, domains: [nam.org, businessroundtable.org, steel.org, aisi.org, nppc.org, nmfp.org, farmprogress.com, brownfieldagnews.com, agweb.com, farms.com, rfdtv.com] }
+    aggregator: { score: 35, domains: [yahoo.com, msn.com, google.com, news.google.com, substack.com, medium.com, opportimes.com] }
+
+  early_warning:
+    enabled: true
+    std_dev_threshold: 2.0
+    min_items_for_alert: 5
+
+# ----------------------------------------------------------------
+# Search API
+# ----------------------------------------------------------------
 search_api:
   api_key_env: "SEARCH_API_KEY"
   base_url: "https://www.searchapi.io/api/v1/search"
@@ -61,17 +294,20 @@ search_api:
   queries:
     macro:
       label: "Macro & Geopolitical Review"
-      q: '"USMCA" OR "CUSMA" OR "T-MEC" "joint review" OR sunset OR Greer OR Ebrard OR Carney'
+      q: '"USMCA" OR "CUSMA" OR "T-MEC" "joint review" OR sunset OR Greer OR Ebrard OR Carney OR Trump OR Sheinbaum'
     sectoral:
       label: "Sectoral Friction & Rules of Origin"
-      q: '"USMCA" OR "T-MEC" "rules of origin" OR automotive OR steel OR aluminum OR dairy OR "biotech corn"'
+      q: '"USMCA" OR "T-MEC" "rules of origin" OR automotive OR steel OR aluminum OR dairy OR "biotech corn" OR supply chain'
     china:
       label: "China Circumvention & Nearshoring"
       q: '"USMCA" OR "T-MEC" China OR EV OR BYD OR circumvention OR nearshoring'
     trade_policy:
       label: "Trade Policy & Tariffs"
-      q: '"USMCA" OR "T-MEC" tariff OR "trade policy" OR USTR OR "rapid response"'
+      q: '"USMCA" OR "T-MEC" tariff OR "trade policy" OR USTR OR "rapid response" OR sanctions'
 
+# ----------------------------------------------------------------
+# Limits
+# ----------------------------------------------------------------
 limits:
   max_concurrent_deepseek: 3
   max_retries: 3

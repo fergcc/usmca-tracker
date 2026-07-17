@@ -7,11 +7,6 @@ from typing import Any
 
 
 class DeepSeekClient:
-    """Thin wrapper around the DeepSeek chat-completions API (OpenAI-compatible).
-
-    Reads DEEPSEEK_API_KEY and DEEPSEEK_BASE_URL from environment.
-    """
-
     def __init__(
         self,
         api_key: str | None = None,
@@ -77,15 +72,15 @@ class DeepSeekClient:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg},
         ]
-        result = self.chat(messages, temperature=0.1, max_tokens=200)
+        result = self.chat(messages, temperature=0.1, max_tokens=300)
         if not result or result.strip().upper() == "NONE":
             return []
         entities: list[str] = []
         for line in result.splitlines():
             line = line.strip()
-            if line.startswith("@") or line.startswith("#"):
+            if line.startswith("@") or line.startswith("#") or line.startswith("+"):
                 entities.append(line)
-        return entities[:8]
+        return entities[:10]
 
     def assess_impact(self, text: str, system_prompt: str, user_prompt: str) -> tuple[int, str]:
         user_msg = user_prompt.format(text=text[:4000])
@@ -93,11 +88,50 @@ class DeepSeekClient:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg},
         ]
-        result = self.chat(messages, temperature=0.2, max_tokens=200)
+        result = self.chat(messages, temperature=0.2, max_tokens=250)
         parts = result.split("|", 1)
         try:
-            score = max(1, min(10, int(parts[0].strip())))
+            score = max(0, min(100, int(parts[0].strip())))
         except (ValueError, IndexError):
-            score = 1
+            score = 0
         reason = parts[1].strip()[:200] if len(parts) > 1 else ""
         return score, reason
+
+    def assess_stance(self, text: str, system_prompt: str, user_prompt: str) -> str:
+        user_msg = user_prompt.format(text=text[:4000])
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ]
+        result = self.chat(messages, temperature=0.0, max_tokens=10)
+        result = result.strip().upper()
+        if result in ("US", "MX", "CA", "MULTI"):
+            return result
+        return "MULTI"
+
+    def assess_tension(
+        self, text: str, system_prompt: str, user_prompt: str
+    ) -> tuple[str, str, int, str] | None:
+        user_msg = user_prompt.format(text=text[:4000])
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ]
+        result = self.chat(messages, temperature=0.1, max_tokens=200)
+        if not result or result.strip().upper() == "NONE":
+            return None
+        parts = result.split("|", 3)
+        if len(parts) < 3:
+            return None
+        origin = parts[0].strip().upper()
+        if origin not in ("US", "MX", "CA"):
+            return None
+        target = parts[1].strip().upper()
+        if target not in ("US", "MX", "CA"):
+            return None
+        try:
+            score = max(0, min(100, int(parts[2].strip())))
+        except (ValueError, IndexError):
+            return None
+        reason = parts[3].strip()[:150] if len(parts) > 3 else ""
+        return (origin, target, score, reason)

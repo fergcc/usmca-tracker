@@ -65,6 +65,12 @@ def prep(it: dict) -> dict:
     sentiment = (it.get("sentiment") or "").lower().strip()
     if sentiment not in ("positive", "negative", "neutral"):
         sentiment = ""
+    stance = (it.get("stance") or "").strip().upper()
+    if stance not in ("US", "MX", "CA", "MULTI"):
+        stance = ""
+    impact_score = it.get("impactScore") or 0
+    if not isinstance(impact_score, (int, float)):
+        impact_score = 0
     return {
         "title": title,
         "url": it["url"],
@@ -74,15 +80,20 @@ def prep(it: dict) -> dict:
         "publishedTs": ts,
         "publishedDisplay": disp,
         "summary": "" if redundant else summary,
-        "score": it["score"],
+        "score": int(impact_score),
         "tags": it.get("tags", []),
         "paywalled": is_paywalled,
         "image": it.get("image_url", ""),
         "aiSummary": ai_summary,
         "sentiment": sentiment,
-        "impactScore": it.get("impactScore", 0),
         "impactReason": clean(it.get("impactReason", "")),
         "aiEntities": it.get("aiEntities", []),
+        "tensionScore": it.get("tensionScore") or 0,
+        "tensionOrigin": it.get("tensionOrigin", ""),
+        "tensionTarget": it.get("tensionTarget", ""),
+        "tensionReason": clean(it.get("tensionReason", "")),
+        "stance": stance,
+        "trustScore": it.get("trustScore", 50),
     }
 
 
@@ -101,17 +112,32 @@ def main():
     items = [prep(it) for it in raw_items]
     items.sort(key=lambda i: (-i["score"], -(i["publishedTs"] or 0)))
 
+    tensions_data = []
+    for it in items:
+        if it.get("tensionScore") and it["tensionScore"] > 0:
+            tensions_data.append({
+                "score": it["tensionScore"],
+                "origin": it["tensionOrigin"],
+                "target": it["tensionTarget"],
+                "reason": it["tensionReason"],
+                "title": it["title"][:100],
+                "url": it["url"],
+            })
+    tensions_data.sort(key=lambda t: -t["score"])
+    tensions_json = json.dumps(tensions_data[:10], ensure_ascii=False, separators=(",", ":"))
+
     generated_display = datetime.now().strftime("%B %-d, %Y") + " &middot; " + datetime.now().strftime("%-I:%M %p")
     today_label = datetime.now().strftime("%b %-d")
     data_json = json.dumps(items, ensure_ascii=False, separators=(",", ":"))
 
     html_out = (
         TEMPLATE.replace("__DATA_JSON__", data_json)
+        .replace("__TENSIONS_JSON__", tensions_json)
         .replace("__GENERATED__", generated_display)
         .replace("__TODAY__", today_label)
     )
     OUT_PATH.write_text(html_out, encoding="utf-8")
-    print(f"Wrote {OUT_PATH} ({len(html_out):,} bytes, {len(items)} items)")
+    print(f"Wrote {OUT_PATH} ({len(html_out):,} bytes, {len(items)} items, {len(tensions_data)} tensions)")
 
 
 TEMPLATE = r"""<meta charset="utf-8">
@@ -581,24 +607,67 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .card-link { display: inline-block; margin-top: 0.6rem; font-size: 0.78rem; font-weight: 600; text-decoration: none; }
   #dash .card-link:hover { text-decoration: underline; }
 
-  /* ---------- AI enrichment elements ---------- */
+  #dash .dash-footer { margin: 2.25rem 0 0; padding: 1.1rem 0 0; border-top: 1px solid var(--hairline); font-size: 0.76rem; color: var(--ink-muted); line-height: 1.6; }
+  #dash .dash-footer p { margin: 0 0 0.4rem; }
+  #dash .dash-footer code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+
+  @media (max-width: 720px) {
+    #dash .stat-strip { grid-template-columns: repeat(2, 1fr); }
+    #dash .clock-label { font-size: 0.58rem; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    #dash .welcome-card, #dash .stat-tile { animation: dashRiseIn 0.5s cubic-bezier(.2,.7,.3,1) both; }
+    #dash .stat-tile:nth-child(1) { animation-delay: 0.03s; }
+    #dash .stat-tile:nth-child(2) { animation-delay: 0.08s; }
+    #dash .stat-tile:nth-child(3) { animation-delay: 0.13s; }
+    #dash .stat-tile:nth-child(4) { animation-delay: 0.18s; }
+  }
+  @keyframes dashRiseIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { #dash * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+  /* ===== v2.0 AI Enrichment Elements ===== */
   #dash .sentiment-badge {
-    display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
-    border-radius: 4px; padding: 0.12rem 0.48rem; margin-left: 0.4rem; vertical-align: middle;
+    display: inline-flex; align-items: center; gap: 0.18rem;
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em;
+    border-radius: 4px; padding: 0.1rem 0.4rem;
     text-transform: uppercase;
   }
-  #dash .sentiment-badge--positive { color: #1b7a3d; background: rgba(27,122,61,0.14); }
+  #dash .sentiment-badge--positive { color: #1b7a3d; background: rgba(27,122,61,0.13); }
   #dash .sentiment-badge--negative { color: #c23a2e; background: var(--sig-critical-bg); }
   #dash .sentiment-badge--neutral  { color: #5f6672; background: var(--hairline); }
 
-  #dash .impact-badge {
-    display: inline-flex; align-items: center; gap: 0.25rem;
-    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
-    font-size: 0.7rem; font-weight: 700; color: var(--sig-notable);
-    background: var(--sig-notable-bg); border-radius: 4px;
-    padding: 0.14rem 0.48rem; margin-left: 0.4rem; vertical-align: middle;
-    cursor: help;
+  #dash .trust-indicator {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    font-size: 0.64rem; color: var(--ink-muted); margin-left: 0.3rem;
   }
+  #dash .trust-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex: none;
+  }
+  #dash .trust-dot--official { background: #c9a235; }
+  #dash .trust-dot--elite    { background: #2451a3; }
+  #dash .trust-dot--trusted  { background: #1f7a68; }
+  #dash .trust-dot--standard { background: #767d89; }
+  #dash .trust-dot--low      { background: #c23a2e; }
+
+  #dash .tension-badge {
+    display: inline-flex; align-items: center; gap: 0.22rem;
+    font-size: 0.66rem; font-weight: 700;
+    border-radius: 4px; padding: 0.1rem 0.45rem;
+    background: rgba(194,58,46,0.16); color: var(--sig-critical);
+    border: 1px solid rgba(194,58,46,0.3);
+  }
+  #dash .card--tension .card-stripe { background: var(--sig-critical) !important; }
+
+  #dash .stance-flag {
+    display: inline-flex; align-items: center; gap: 0.18rem;
+    font-size: 0.64rem; font-weight: 700; letter-spacing: 0.03em;
+    border-radius: 3px; padding: 0.08rem 0.3rem;
+    text-transform: uppercase; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  #dash .stance-flag--US { background: var(--wash-blue); color: var(--accent); }
+  #dash .stance-flag--MX { background: rgba(206,17,38,0.1); color: var(--wash-red); }
+  #dash .stance-flag--CA { background: rgba(4,106,56,0.1); color: var(--wash-green); }
+  #dash .stance-flag--MULTI { background: var(--hairline); color: var(--ink-muted); }
 
   #dash .ai-summary {
     margin: 0.55rem 0 0; font-size: 0.84rem; color: var(--ink-soft); line-height: 1.5;
@@ -625,28 +694,39 @@ TEMPLATE = r"""<meta charset="utf-8">
     border: 1px solid rgba(126,166,232,0.2);
   }
 
-  #dash .card-footer-row {
+  .card-footer-row {
     display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
     margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--hairline);
   }
 
-  #dash .dash-footer { margin: 2.25rem 0 0; padding: 1.1rem 0 0; border-top: 1px solid var(--hairline); font-size: 0.76rem; color: var(--ink-muted); line-height: 1.6; }
-  #dash .dash-footer p { margin: 0 0 0.4rem; }
-  #dash .dash-footer code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  /* ===== Tension Monitor ===== */
+  #dash .tension-panel { border-radius: 18px; padding: 1rem 1.2rem; margin-bottom: 1.1rem; }
+  #dash .tension-empty { font-size: 0.82rem; color: var(--ink-muted); padding: 0.4rem 0; }
+  #dash .tension-item {
+    display: flex; align-items: center; gap: 0.7rem; padding: 0.45rem 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  #dash .tension-item:last-child { border-bottom: none; }
+  #dash .tension-arrow { font-weight: 700; font-size: 0.78rem; color: var(--accent); min-width: 2.8rem; }
+  #dash .tension-score-badge {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px;
+    min-width: 2.8rem; text-align: center;
+  }
+  #dash .tension-score--high { background: rgba(194,58,46,0.18); color: var(--sig-critical); }
+  #dash .tension-score--mid  { background: var(--sig-notable-bg); color: var(--sig-notable); }
+  #dash .tension-score--low  { background: var(--hairline); color: var(--ink-muted); }
+  #dash .tension-reason { font-size: 0.78rem; color: var(--ink-soft); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  @media (max-width: 720px) {
-    #dash .stat-strip { grid-template-columns: repeat(2, 1fr); }
-    #dash .clock-label { font-size: 0.58rem; }
+  /* ===== Early Warning Banner ===== */
+  #dash .ew-banner {
+    border-radius: 14px; padding: 0.7rem 1.1rem; margin-bottom: 1rem;
+    background: rgba(194,58,46,0.1); border: 1px solid rgba(194,58,46,0.25);
+    font-size: 0.82rem; font-weight: 600; color: var(--sig-critical);
+    display: none; align-items: center; gap: 0.5rem;
   }
-  @media (prefers-reduced-motion: no-preference) {
-    #dash .welcome-card, #dash .stat-tile { animation: dashRiseIn 0.5s cubic-bezier(.2,.7,.3,1) both; }
-    #dash .stat-tile:nth-child(1) { animation-delay: 0.03s; }
-    #dash .stat-tile:nth-child(2) { animation-delay: 0.08s; }
-    #dash .stat-tile:nth-child(3) { animation-delay: 0.13s; }
-    #dash .stat-tile:nth-child(4) { animation-delay: 0.18s; }
-  }
-  @keyframes dashRiseIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-  @media (prefers-reduced-motion: reduce) { #dash * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+  #dash .ew-banner.is-visible { display: flex; }
+  #dash .ew-banner-icon { font-size: 1.05rem; }
 </style>
 
 <div class="dash" id="dash">
@@ -700,8 +780,10 @@ TEMPLATE = r"""<meta charset="utf-8">
       </section>
 
       <section class="stat-strip" aria-label="Summary">
-        <div class="stat-tile glass stat-tile--critical"><p class="stat-label">Critical signal</p><p class="stat-value" id="statCritical">0</p><p class="stat-sub">score &ge; 10</p></div>
+        <div class="stat-tile glass stat-tile--critical"><p class="stat-label">Critical signal</p><p class="stat-value" id="statCritical">0</p><p class="stat-sub">score &ge; 70</p></div>
         <div class="stat-tile glass"><p class="stat-label">Most active principal</p><p class="stat-value stat-value--text" id="statPlayer">&mdash;</p><p class="stat-sub" id="statPlayerCount">&nbsp;</p></div>
+        <div class="stat-tile glass"><p class="stat-label">Sentiment trend</p><p class="stat-value stat-value--text" id="statSentiment">&mdash;</p><p class="stat-sub">articles negative</p></div>
+        <div class="stat-tile glass"><p class="stat-label">Dominant stance</p><p class="stat-value stat-value--text" id="statStance">&mdash;</p><p class="stat-sub">top perspective by country</p></div>
         <div class="stat-tile glass stat-tile--composition"><p class="stat-label">Source mix</p><div class="comp-bar" id="compBar" role="img" aria-label="Source composition"></div><div class="comp-legend" id="compLegend"></div></div>
       </section>
 
@@ -730,6 +812,13 @@ TEMPLATE = r"""<meta charset="utf-8">
         </div>
       </div>
 
+      <section class="tension-panel glass" id="tensionPanel" aria-label="Tension Monitor" hidden>
+        <p class="clock-caption">Tension Monitor</p>
+        <div id="tensionList"></div>
+      </section>
+
+      <div class="early-warning-banner ew-banner" id="ewBanner" aria-live="polite"><span class="ew-banner-icon">&#9888;</span> <span id="ewBannerText"></span></div>
+
       <div class="tracker-main">
         <p class="result-count" id="resultCount"></p>
         <section class="feed" id="feed" aria-live="polite"></section>
@@ -756,6 +845,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 <script>
 (function () {
   const DATA = __DATA_JSON__;
+  const TENSIONS = __TENSIONS_JSON__;
 
   const fmtRange = (a, b) => {
     if (!a || !b) return "";
@@ -785,28 +875,42 @@ TEMPLATE = r"""<meta charset="utf-8">
     const rangeStr = tsList.length ? fmtRange(tsList[0], tsList[tsList.length - 1]) : "";
     document.getElementById("rangeText").textContent = rangeStr || "";
 
-    const critical = DATA.filter(d => d.score >= 10).length;
+    const critical = DATA.filter(d => d.score >= 70).length;
     document.getElementById("statCritical").textContent = critical;
 
     const playerTally = {};
-    DATA.forEach(d => (d.tags || []).forEach(t => {
-      if (t.startsWith("@")) playerTally[t.slice(1)] = (playerTally[t.slice(1)] || 0) + 1;
-    }));
+    DATA.forEach(d => {
+      (d.tags || []).forEach(t => { if (t.startsWith("@")) playerTally[t.slice(1)] = (playerTally[t.slice(1)] || 0) + 1; });
+      (d.aiEntities || []).forEach(t => { if (t.startsWith("@")) playerTally[t.slice(1)] = (playerTally[t.slice(1)] || 0) + 1; });
+    });
     const topPlayer = Object.entries(playerTally).sort((a, b) => b[1] - a[1])[0];
     if (topPlayer) {
       document.getElementById("statPlayer").textContent = topPlayer[0];
       document.getElementById("statPlayerCount").textContent = `${topPlayer[1]} mention${topPlayer[1] === 1 ? "" : "s"}`;
     }
 
-    const compColors = { federal_register: "var(--comp-fedreg)", google_news: "var(--comp-gnews)", site_feed: "var(--comp-site)", congress: "var(--comp-congress)" };
-    const compNames = { federal_register: "Federal Register", google_news: "Google News queries", site_feed: "Site feeds", congress: "Congress.gov bills" };
-    const compCounts = { federal_register: 0, google_news: 0, site_feed: 0, congress: 0 };
+    const sentTotal = DATA.filter(d => d.sentiment).length;
+    if (sentTotal) {
+      const neg = DATA.filter(d => d.sentiment === "negative").length;
+      document.getElementById("statSentiment").textContent = Math.round(neg / sentTotal * 100) + "% negative";
+    }
+
+    const stanceTally = {};
+    DATA.forEach(d => { if (d.stance) stanceTally[d.stance] = (stanceTally[d.stance] || 0) + 1; });
+    const topStance = Object.entries(stanceTally).sort((a, b) => b[1] - a[1])[0];
+    if (topStance) {
+      document.getElementById("statStance").textContent = topStance[0] + " (" + topStance[1] + ")";
+    }
+
+    const compColors = { federal_register: "var(--comp-fedreg)", google_news: "var(--comp-gnews)", site_feed: "var(--comp-site)", congress: "var(--comp-congress)", search_api: "#c9a235" };
+    const compNames = { federal_register: "Federal Register", google_news: "Google News", site_feed: "Site feeds", congress: "Congress.gov", search_api: "SearchAPI" };
+    const compCounts = { federal_register: 0, google_news: 0, site_feed: 0, congress: 0, search_api: 0 };
     DATA.forEach(d => { compCounts[d.origin] = (compCounts[d.origin] || 0) + 1; });
     const total = DATA.length || 1;
     const bar = document.getElementById("compBar");
     const legend = document.getElementById("compLegend");
     bar.innerHTML = ""; legend.innerHTML = "";
-    ["federal_register", "congress", "google_news", "site_feed"].forEach(key => {
+    ["federal_register", "congress", "google_news", "site_feed", "search_api"].forEach(key => {
       const n = compCounts[key] || 0;
       if (!n) return;
       const seg = document.createElement("div");
@@ -859,9 +963,29 @@ TEMPLATE = r"""<meta charset="utf-8">
   }
 
   function band(score) {
-    if (score >= 10) return "critical";
-    if (score >= 5) return "notable";
+    if (score >= 70) return "critical";
+    if (score >= 40) return "notable";
     return "routine";
+  }
+
+  function tensionBand(score) {
+    if (score >= 60) return "high";
+    if (score >= 30) return "mid";
+    return "low";
+  }
+
+  function trustTier(score) {
+    if (score >= 90) return "official";
+    if (score >= 80) return "elite";
+    if (score >= 70) return "trusted";
+    if (score >= 55) return "standard";
+    return "low";
+  }
+
+  function stanceFlag(stance) {
+    if (!stance) return "";
+    const labels = { US: "US", MX: "MX", CA: "CA", MULTI: "MULTI" };
+    return `<span class="stance-flag stance-flag--${stance}">${labels[stance] || stance}</span>`;
   }
 
   function renderCard(item) {
@@ -871,6 +995,7 @@ TEMPLATE = r"""<meta charset="utf-8">
           if (item.aiEntities && item.aiEntities.includes(t)) {
             return `<span class="ai-tag">${escapeHtml(t)}</span>`;
           }
+          if (t.startsWith("+")) return `<span class="ai-tag">${escapeHtml(t.slice(1))}</span>`;
           return `<span class="${tagClass(t)}">${escapeHtml(t)}</span>`;
         }).join("")}</div>`
       : "";
@@ -881,25 +1006,31 @@ TEMPLATE = r"""<meta charset="utf-8">
     const sentimentHtml = item.sentiment
       ? `<span class="sentiment-badge sentiment-badge--${escapeHtml(item.sentiment)}">${escapeHtml(item.sentiment)}</span>`
       : "";
-    const impactHtml = item.impactScore
-      ? `<span class="impact-badge" title="${escapeHtml(item.impactReason || '')}">⚡ ${item.impactScore}/10</span>`
+    const stanceHtml = stanceFlag(item.stance);
+    const trustHtml = `<span class="trust-indicator" title="Source trust: ${item.trustScore}/100"><span class="trust-dot trust-dot--${trustTier(item.trustScore)}"></span></span>`;
+    const tensionHtml = item.tensionScore && item.tensionScore > 0
+      ? `<span class="tension-badge" title="${escapeHtml(item.tensionReason)}">⚡${item.tensionScore}/100 ${item.tensionOrigin}&rarr;${item.tensionTarget}</span>`
+      : "";
+    const impactReasonHtml = item.impactReason
+      ? ` title="${escapeHtml(item.impactReason)}"`
       : "";
     const lockBadge = item.paywalled ? `<span class="lock-badge">headlines only</span>` : "";
     const dateHtml = item.publishedDisplay ? `<span class="dot">&middot;</span><time>${escapeHtml(item.publishedDisplay)}</time>` : "";
     const imgHtml = item.image
       ? `<img class="card-thumb" src="${escapeHtml(item.image)}" alt="" loading="lazy" onerror="this.remove()">`
       : "";
-    const rot = ((item.score * 53) % 7) - 3;
+    const tensionClass = item.tensionScore && item.tensionScore > 50 ? " card--tension" : "";
+    const rot = ((item.score * 37) % 9) - 4;
     return `
-      <article class="card card--${band(item.score)}">
+      <article class="card card--${band(item.score)}${tensionClass}">
         <div class="card-stripe"></div>
         ${imgHtml}
         <div class="card-body">
           <div class="card-top">
-            <span class="score-badge" style="--stamp-rot:${rot}deg">${item.score}</span>
+            <span class="score-badge" style="--stamp-rot:${rot}deg"${impactReasonHtml}>${item.score}</span>
             <div class="card-heading">
               <a class="card-title" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${lockBadge}${sentimentHtml}${impactHtml}${dateHtml}</p>
+              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${trustHtml}${lockBadge}${stanceHtml}${sentimentHtml}${tensionHtml}${dateHtml}</p>
             </div>
           </div>
           ${allTagsHtml}
@@ -972,6 +1103,36 @@ TEMPLATE = r"""<meta charset="utf-8">
     btn.classList.toggle("is-visible", window.scrollY > 480);
   }
 
+  function renderTensionMonitor() {
+    const panel = document.getElementById("tensionPanel");
+    const list = document.getElementById("tensionList");
+    if (!TENSIONS || !TENSIONS.length) {
+      if (panel) panel.hidden = true;
+      return;
+    }
+    if (panel) panel.hidden = false;
+    const top = TENSIONS.slice(0, 5);
+    list.innerHTML = top.map(t => {
+      const tier = tensionBand(t.score);
+      return `<div class="tension-item">
+        <span class="tension-arrow">${t.origin}&rarr;${t.target}</span>
+        <span class="tension-score-badge tension-score--${tier}">${t.score}/100</span>
+        <span class="tension-reason" title="${escapeHtml(t.reason)}">${escapeHtml(t.reason || t.title)}</span>
+      </div>`;
+    }).join("");
+  }
+
+  function checkEarlyWarnings() {
+    const banner = document.getElementById("ewBanner");
+    const text = document.getElementById("ewBannerText");
+    if (!TENSIONS || !TENSIONS.length) return;
+    const highTension = TENSIONS.filter(t => t.score >= 75);
+    if (highTension.length >= 2) {
+      banner.classList.add("is-visible");
+      text.textContent = `High tension detected: ${highTension.length} events above 75/100. Possible escalation in progress.`;
+    }
+  }
+
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
     try { localStorage.setItem("usmca-theme", theme); } catch (e) {}
@@ -993,6 +1154,8 @@ TEMPLATE = r"""<meta charset="utf-8">
 
     computeStats();
     buildFilters();
+    renderTensionMonitor();
+    checkEarlyWarnings();
 
     const maxScore = Math.max(0, ...DATA.map(d => d.score));
     const slider = document.getElementById("scoreSlider");

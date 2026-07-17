@@ -1,8 +1,4 @@
-"""Enricher — reads items.jsonl and adds AI-analysis fields from the Engine pipeline.
-
-Writes a parallel items_enriched.jsonl with the original data + aiSummary,
-sentiment, impactScore, impactReason, and aiEntities.
-"""
+"""Enricher — reads items.jsonl and adds AI-analysis fields from the Engine pipeline."""
 
 from __future__ import annotations
 
@@ -13,6 +9,7 @@ from typing import Any
 
 from .analyzer import Analyzer
 from .deepseek_client import DeepSeekClient
+from .trust import get_trust
 
 
 def _item_uid(title: str, url: str) -> str:
@@ -42,7 +39,9 @@ def _save_jsonl(path: str | Path, items: list[dict[str, Any]]) -> None:
     print(f"[enricher] Wrote {len(items)} items to {p}")
 
 
-def _merge_items(existing: list[dict[str, Any]], new_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _merge_items(
+    existing: list[dict[str, Any]], new_items: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     seen = {_item_uid(it["title"], it["url"]) for it in existing}
     added = 0
     for item in new_items:
@@ -57,8 +56,6 @@ def _merge_items(existing: list[dict[str, Any]], new_items: list[dict[str, Any]]
 
 
 class Enricher:
-    """Reads JSONL items, runs AI analysis via DeepSeek, writes enriched JSONL."""
-
     def __init__(
         self,
         analyzer: Analyzer | None = None,
@@ -74,6 +71,7 @@ class Enricher:
         source_path: str | Path,
         output_path: str | Path | None = None,
         skip_existing: bool = True,
+        config: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         items = _load_jsonl(source_path)
         if not items:
@@ -81,16 +79,23 @@ class Enricher:
 
         items_to_enrich = items
         if skip_existing:
-            items_to_enrich = [it for it in items if "aiSummary" not in it]
+            items_to_enrich = [it for it in items if "impactScore" not in it
+                               or it.get("impactScore", 0) == 0]
             already = len(items) - len(items_to_enrich)
             if already:
                 print(f"[enricher] {already} items already enriched — skipping.")
+
         if not items_to_enrich:
             print("[enricher] All items already enriched.")
+            for it in items:
+                it["trustScore"] = get_trust(it.get("url", ""), config)
             return items
 
         print(f"[enricher] Analyzing {len(items_to_enrich)} items with DeepSeek...")
         self.analyzer.analyze_batch(items_to_enrich)
+
+        for it in items:
+            it["trustScore"] = get_trust(it.get("url", ""), config)
 
         if output_path:
             _save_jsonl(output_path, items)

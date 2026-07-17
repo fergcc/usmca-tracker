@@ -68,9 +68,6 @@ jobs:
           python3 -m Engine.engine run
 
       - name: Rebuild dashboard
-        run: python3 build_dashboard.py
-
-      - name: Commit updated dashboard
         run: |
           git config user.name "usmca-tracker-bot"
           git config user.email "actions@users.noreply.github.com"
