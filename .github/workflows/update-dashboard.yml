@@ -80,5 +80,14 @@ jobs:
             echo "No dashboard changes."
           else
             git commit -m "Auto-update dashboard $(date -u +%Y-%m-%dT%H:%MZ)"
-            git push
+            # Runs take a while (AI enrichment), so main can move in the
+            # meantime (another run, a manual push). Rebase and retry a
+            # few times instead of failing the whole job on a push race.
+            for i in 1 2 3; do
+              git push && break
+              echo "Push rejected, rebasing onto latest main and retrying (attempt $i)..."
+              git fetch origin main
+              git rebase origin/main
+              sleep 5
+            done
           fi
