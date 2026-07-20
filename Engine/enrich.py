@@ -13,6 +13,12 @@ from .trust import get_trust
 from .bias import get_source_bias, compute_bias
 from .fallback import calculate_fallback_score
 
+AI_FIELDS = [
+    "impactScore", "impactReason", "aiSummary", "sentiment", "aiEntities",
+    "stance", "tensionScore", "tensionOrigin", "tensionTarget", "tensionReason",
+    "biasScore", "biasReason",
+]
+
 
 def _item_uid(title: str, url: str) -> str:
     raw = f"{url}|{title}".encode("utf-8")
@@ -78,6 +84,22 @@ class Enricher:
         items = _load_jsonl(source_path)
         if not items:
             return []
+
+        if skip_existing and output_path:
+            previously_enriched = _load_jsonl(output_path)
+            by_uid = {
+                _item_uid(it["title"], it["url"]): it for it in previously_enriched
+            }
+            carried = 0
+            for it in items:
+                prev = by_uid.get(_item_uid(it["title"], it["url"]))
+                if prev:
+                    for field in AI_FIELDS:
+                        if field in prev:
+                            it[field] = prev[field]
+                    carried += 1
+            if carried:
+                print(f"[enricher] Carried forward AI fields for {carried} previously-enriched items.")
 
         items_to_enrich = items
         if skip_existing:

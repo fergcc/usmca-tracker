@@ -52,13 +52,6 @@ jobs:
             python3 usmca_tracker.py --config config.yaml
           fi
 
-      - name: Save tracker state
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: data
-          key: usmca-data-${{ github.run_id }}
-
       - name: Run TMEC Engine (search + AI enrich)
         env:
           SEARCH_API_KEY: ${{ secrets.SEARCH_API_KEY }}
@@ -66,6 +59,16 @@ jobs:
         run: |
           python3 -m pip install -r Engine/requirements.txt
           python3 -m Engine.engine run
+
+      # Saved after the Engine step (not before) so items_enriched.jsonl —
+      # which the engine writes — is included and AI scores persist across
+      # runs instead of being recomputed from scratch every time.
+      - name: Save tracker state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: usmca-data-${{ github.run_id }}
 
       - name: Rebuild dashboard
         run: |
