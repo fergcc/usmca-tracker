@@ -10,6 +10,8 @@ from typing import Any
 from .analyzer import Analyzer
 from .deepseek_client import DeepSeekClient
 from .trust import get_trust
+from .bias import get_source_bias, compute_bias
+from .fallback import calculate_fallback_score
 
 
 def _item_uid(title: str, url: str) -> str:
@@ -96,6 +98,13 @@ class Enricher:
 
         for it in items:
             it["trustScore"] = get_trust(it.get("url", ""), config)
+            sb = get_source_bias(it.get("url", ""), config)
+            cb = it.get("biasScore")
+            it["biasScore"] = compute_bias(sb, cb if cb else None)
+            if not it.get("impactScore") or it.get("impactScore", 0) == 0:
+                fallback_score, fallback_reason = calculate_fallback_score(it, config)
+                it["impactScore"] = fallback_score
+                it["impactReason"] = it.get("impactReason", "") or fallback_reason
 
         if output_path:
             _save_jsonl(output_path, items)

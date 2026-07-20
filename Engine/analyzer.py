@@ -49,12 +49,13 @@ class Analyzer:
         result: dict[str, Any] = {}
 
         tasks: list[tuple[str, str, callable]] = [
-            ("summary", "summarize", self._run_summarize),
+            ("summarize", "summarize", self._run_summarize),
             ("sentiment", "sentiment", self._run_sentiment),
             ("entities", "entities", self._run_entities),
             ("impact", "impact", self._run_impact),
             ("stance", "stance", self._run_stance),
             ("tension", "tension", self._run_tension),
+            ("bias", "bias", self._run_bias),
         ]
 
         for prompt_key, _internal_key, fn in tasks:
@@ -162,7 +163,21 @@ class Analyzer:
             except Exception:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
-        return None
+                return None
+
+    def _run_bias(self, text: str, prompt_cfg: dict[str, str]) -> dict[str, Any] | None:
+        for attempt in range(self.max_retries):
+            try:
+                score, reason = self.deepseek.assess_bias(
+                    text,
+                    system_prompt=prompt_cfg.get("system", ""),
+                    user_prompt=prompt_cfg.get("user", ""),
+                )
+                return {"biasScore": score, "biasReason": reason}
+            except Exception:
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay)
+        return {"biasScore": 0, "biasReason": ""}
 
     def analyze_batch(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
         total = len(articles)

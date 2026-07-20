@@ -10,13 +10,13 @@ deepseek:
 
   prompts:
     summarize:
-      system: "Eres un analista de inteligencia comercial especializado en el T-MEC/USMCA/CUSMA. Responde siempre en español."
+      system: "You are a trade intelligence analyst specialized in the USMCA/T-MEC/CUSMA. You respond ONLY in English. Never use Spanish."
       user: |
-        Resume el siguiente artículo sobre el T-MEC en exactamente 2-3 oraciones en español.
-        Enfócate en lo más relevante para el acuerdo comercial: decisiones, plazos, fricciones, actores clave y sectores afectados.
-        No incluyas frases como \"El artículo trata sobre...\". Ve directo al contenido.
+        Summarize the following article about USMCA/T-MEC in exactly 2-3 sentences in English only.
+        Focus on what matters for the trade agreement: decisions, deadlines, friction points, key players, and affected sectors.
+        Do not use phrases like \"This article is about...\". Get straight to the content.
 
-        Artículo:
+        Article:
         {text}
 
     sentiment:
@@ -103,6 +103,22 @@ deepseek:
         RAZÓN es una frase breve (máximo 80 caracteres)
 
         Artículo:
+        {text}
+
+    bias:
+      system: "You are a media bias analyst. Respond with EXACTLY the format indicated, no extra text."
+      user: |
+        Analyze this article for media bias on a scale of 0 (perfectly balanced) to 100 (heavily biased/one-sided).
+
+        Evaluate these 3 sub-dimensions:
+        1. Language framing (0-50): loaded terms, sensationalism, emotional language
+        2. Source balance (0-30): are all countries' views represented or is it one-sided?
+        3. Fact vs opinion (0-20): is this neutral reporting or editorializing?
+
+        Respond EXACTLY in this format, one line:
+        BIAS_SCORE|REASON (max 130 chars)
+
+        Article:
         {text}
 
 # ----------------------------------------------------------------
@@ -276,6 +292,63 @@ scoring:
     general_press: { score: 65, domains: [apnews.com, usatoday.com, thestar.com, eluniversal.com.mx, elfinanciero.com.mx, cbc.ca, theglobeandmail.com, aljazeera.com, bbc.com, newsweek.com, thehill.com, dallasnews.com, chron.com] }
     industry: { score: 60, domains: [nam.org, businessroundtable.org, steel.org, aisi.org, nppc.org, nmfp.org, farmprogress.com, brownfieldagnews.com, agweb.com, farms.com, rfdtv.com] }
     aggregator: { score: 35, domains: [yahoo.com, msn.com, google.com, news.google.com, substack.com, medium.com, opportimes.com] }
+
+  source_bias:
+    ustr.gov: { country: US, lean: admin-aligned, bias: 85 }
+    whitehouse.gov: { country: US, lean: admin-aligned, bias: 85 }
+    state.gov: { country: US, lean: admin-aligned, bias: 80 }
+    economy.gob.mx: { country: MX, lean: admin-aligned, bias: 80 }
+    dof.gob.mx: { country: MX, lean: admin-aligned, bias: 75 }
+    international.gc.ca: { country: CA, lean: admin-aligned, bias: 75 }
+    pm.gc.ca: { country: CA, lean: admin-aligned, bias: 75 }
+    federalregister.gov: { country: US, lean: neutral, bias: 20 }
+    congress.gov: { country: US, lean: neutral, bias: 20 }
+    bloomberg.com: { country: US, lean: centrist, bias: 25 }
+    reuters.com: { country: MULTI, lean: centrist, bias: 10 }
+    ft.com: { country: MULTI, lean: centrist, bias: 20 }
+    wsj.com: { country: US, lean: center-right, bias: 40 }
+    nytimes.com: { country: US, lean: center-left, bias: 35 }
+    washingtonpost.com: { country: US, lean: center-left, bias: 35 }
+    economist.com: { country: MULTI, lean: center-right, bias: 30 }
+    insidetrade.com: { country: US, lean: trade-specialized, bias: 45 }
+    politico.com: { country: US, lean: centrist, bias: 30 }
+    law360.com: { country: US, lean: legal-neutral, bias: 15 }
+    csis.org: { country: US, lean: center-right, bias: 30 }
+    brookings.edu: { country: US, lean: center-left, bias: 30 }
+    atlanticcouncil.org: { country: US, lean: centrist, bias: 25 }
+    cfr.org: { country: US, lean: centrist, bias: 25 }
+    apnews.com: { country: US, lean: neutral, bias: 15 }
+    eluniversal.com.mx: { country: MX, lean: centrist, bias: 40 }
+    elfinanciero.com.mx: { country: MX, lean: center-left, bias: 45 }
+    cbc.ca: { country: CA, lean: center-left, bias: 35 }
+    theglobeandmail.com: { country: CA, lean: centrist, bias: 25 }
+    thehill.com: { country: US, lean: centrist, bias: 25 }
+    bbc.com: { country: MULTI, lean: neutral, bias: 15 }
+    aljazeera.com: { country: MULTI, lean: center-left, bias: 25 }
+    newsweek.com: { country: US, lean: centrist, bias: 25 }
+    opportimes.com: { country: MX, lean: center-left, bias: 35 }
+    mexicobusiness.news: { country: MX, lean: pro-business, bias: 30 }
+    rethinktrade.org: { country: US, lean: left, bias: 45 }
+    as-coa.org: { country: US, lean: centrist, bias: 20 }
+    rfdtv.com: { country: US, lean: ag-focused, bias: 25 }
+    agweb.com: { country: US, lean: ag-focused, bias: 25 }
+    farmprogress.com: { country: US, lean: ag-focused, bias: 25 }
+    yahoo.com: { country: MULTI, lean: aggregator, bias: 10 }
+    substack.com: { country: MULTI, lean: individual, bias: 50 }
+    medium.com: { country: MULTI, lean: individual, bias: 45 }
+    bostonconsultinggroup.com: { country: MULTI, lean: business, bias: 20 }
+    rbc.com: { country: CA, lean: financial, bias: 25 }
+    s&pglobal.com: { country: MULTI, lean: financial, bias: 15 }
+    americasquarterly.org: { country: US, lean: centrist, bias: 20 }
+    bakerinstitute.org: { country: US, lean: center-right, bias: 30 }
+    wilsoncenter.org: { country: US, lean: centrist, bias: 20 }
+    piie.com: { country: US, lean: centrist, bias: 20 }
+    allianceforamericanmanufacturing.org: { country: US, lean: left, bias: 45 }
+    aisi.org: { country: US, lean: industry, bias: 40 }
+    nam.org: { country: US, lean: industry, bias: 40 }
+    steel.org: { country: US, lean: industry, bias: 40 }
+    dal.ca: { country: CA, lean: academic, bias: 20 }
+    hcamag.com: { country: CA, lean: centrist, bias: 30 }
 
   early_warning:
     enabled: true

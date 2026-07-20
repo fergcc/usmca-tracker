@@ -81,7 +81,7 @@ def prep(it: dict) -> dict:
         "publishedDisplay": disp,
         "summary": "" if redundant else summary,
         "score": int(impact_score),
-        "tags": it.get("tags", []),
+        "tags": it.get("aiEntities", []),
         "paywalled": is_paywalled,
         "image": it.get("image_url", ""),
         "aiSummary": ai_summary,
@@ -94,6 +94,7 @@ def prep(it: dict) -> dict:
         "tensionReason": clean(it.get("tensionReason", "")),
         "stance": stance,
         "trustScore": it.get("trustScore", 50),
+        "biasScore": it.get("biasScore", 0),
     }
 
 
@@ -727,6 +728,18 @@ TEMPLATE = r"""<meta charset="utf-8">
   }
   #dash .ew-banner.is-visible { display: flex; }
   #dash .ew-banner-icon { font-size: 1.05rem; }
+
+  /* ===== Bias Indicator ===== */
+  #dash .bias-bar {
+    display: inline-flex; vertical-align: middle; align-items: center;
+    width: 40px; height: 6px; border-radius: 3px;
+    background: var(--hairline); overflow: hidden; margin: 0 0.3rem;
+  }
+  #dash .bias-bar-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, #1b7a3d 0%, #c9a235 50%, #c23a2e 100%);
+    display: block;
+  }
 </style>
 
 <div class="dash" id="dash">
@@ -784,7 +797,8 @@ TEMPLATE = r"""<meta charset="utf-8">
         <div class="stat-tile glass"><p class="stat-label">Most active principal</p><p class="stat-value stat-value--text" id="statPlayer">&mdash;</p><p class="stat-sub" id="statPlayerCount">&nbsp;</p></div>
         <div class="stat-tile glass"><p class="stat-label">Sentiment trend</p><p class="stat-value stat-value--text" id="statSentiment">&mdash;</p><p class="stat-sub">articles negative</p></div>
         <div class="stat-tile glass"><p class="stat-label">Dominant stance</p><p class="stat-value stat-value--text" id="statStance">&mdash;</p><p class="stat-sub">top perspective by country</p></div>
-        <div class="stat-tile glass stat-tile--composition"><p class="stat-label">Source mix</p><div class="comp-bar" id="compBar" role="img" aria-label="Source composition"></div><div class="comp-legend" id="compLegend"></div></div>
+        <div class="stat-tile glass"><p class="stat-label">Avg bias</p><p class="stat-value stat-value--text" id="statBias">&mdash;</p><p class="stat-sub" id="statBiasLabel">&nbsp;</p></div>
+        <div class="stat-tile glass stat-tile--composition" style="grid-column: span 2;"><p class="stat-label">Source mix</p><div class="comp-bar" id="compBar" role="img" aria-label="Source composition"></div><div class="comp-legend" id="compLegend"></div></div>
       </section>
 
       <div class="control-row--chipsort">
@@ -861,6 +875,9 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   const US_GROUPS = new Set(["USTR (official)", "Inside U.S. Trade", "CSIS", "Rethink Trade"]);
   function countryOf(item) {
+    if (item.stance === "US") return "United States";
+    if (item.stance === "MX") return "Mexico";
+    if (item.stance === "CA") return "Canada";
     if (item.origin === "federal_register" || item.origin === "congress") return "United States";
     if (US_GROUPS.has(item.group)) return "United States";
     if (item.group === "Global Affairs Canada") return "Canada";
@@ -902,6 +919,14 @@ TEMPLATE = r"""<meta charset="utf-8">
       document.getElementById("statStance").textContent = topStance[0] + " (" + topStance[1] + ")";
     }
 
+    const biasScores = DATA.filter(d => d.biasScore > 0).map(d => d.biasScore);
+    if (biasScores.length) {
+      const avgBias = Math.round(biasScores.reduce((a, b) => a + b, 0) / biasScores.length);
+      document.getElementById("statBias").textContent = avgBias + "/100";
+      const lbl = avgBias <= 20 ? "balanced" : avgBias <= 40 ? "mild" : avgBias <= 60 ? "moderate" : avgBias <= 80 ? "strong" : "heavy";
+      document.getElementById("statBiasLabel").textContent = "avg " + lbl;
+    }
+
     const compColors = { federal_register: "var(--comp-fedreg)", google_news: "var(--comp-gnews)", site_feed: "var(--comp-site)", congress: "var(--comp-congress)", search_api: "#c9a235" };
     const compNames = { federal_register: "Federal Register", google_news: "Google News", site_feed: "Site feeds", congress: "Congress.gov", search_api: "SearchAPI" };
     const compCounts = { federal_register: 0, google_news: 0, site_feed: 0, congress: 0, search_api: 0 };
@@ -939,9 +964,10 @@ TEMPLATE = r"""<meta charset="utf-8">
     });
 
     const actorCounts = {};
-    DATA.forEach(d => (d.tags || []).forEach(t => {
-      if (t.startsWith("@")) actorCounts[t.slice(1)] = (actorCounts[t.slice(1)] || 0) + 1;
-    }));
+    DATA.forEach(d => {
+      (d.tags || []).forEach(t => { if (t.startsWith("@")) actorCounts[t.slice(1)] = (actorCounts[t.slice(1)] || 0) + 1; });
+      (d.aiEntities || []).forEach(t => { if (t.startsWith("@")) actorCounts[t.slice(1)] = (actorCounts[t.slice(1)] || 0) + 1; });
+    });
     const actors = Object.keys(actorCounts).sort((a, b) => actorCounts[b] - actorCounts[a]);
     const actorSel = document.getElementById("actorFilter");
     actors.forEach(a => {
@@ -989,25 +1015,25 @@ TEMPLATE = r"""<meta charset="utf-8">
   }
 
   function renderCard(item) {
-    const allTags = [...(item.tags || []), ...(item.aiEntities || [])];
+    const allTags = item.aiEntities || [];
     const allTagsHtml = allTags.length
       ? `<div class="tag-row">${allTags.map(t => {
-          if (item.aiEntities && item.aiEntities.includes(t)) {
-            return `<span class="ai-tag">${escapeHtml(t)}</span>`;
-          }
-          if (t.startsWith("+")) return `<span class="ai-tag">${escapeHtml(t.slice(1))}</span>`;
-          return `<span class="${tagClass(t)}">${escapeHtml(t)}</span>`;
+          if (t.startsWith("+")) return `<span class="ai-tag">${escapeHtml(t)}</span>`;
+          if (t.startsWith("@")) return `<span class="ai-tag">${escapeHtml(t)}</span>`;
+          if (t.startsWith("#")) return `<span class="ai-tag">${escapeHtml(t)}</span>`;
+          return `<span class="ai-tag">${escapeHtml(t)}</span>`;
         }).join("")}</div>`
       : "";
     const summaryHtml = item.summary ? `<p class="card-summary">${escapeHtml(item.summary)}</p>` : "";
     const aiSummaryHtml = item.aiSummary
-      ? `<details class="ai-summary"><summary>AI Summary</summary><p>${escapeHtml(item.aiSummary)}</p></details>`
+      ? `<details class="ai-summary"><summary>SUMMARY</summary><p>${escapeHtml(item.aiSummary)}</p></details>`
       : "";
     const sentimentHtml = item.sentiment
       ? `<span class="sentiment-badge sentiment-badge--${escapeHtml(item.sentiment)}">${escapeHtml(item.sentiment)}</span>`
       : "";
     const stanceHtml = stanceFlag(item.stance);
     const trustHtml = `<span class="trust-indicator" title="Source trust: ${item.trustScore}/100"><span class="trust-dot trust-dot--${trustTier(item.trustScore)}"></span></span>`;
+    const biasBarHtml = `<span class="bias-bar" title="Bias: ${item.biasScore}/100"><span class="bias-bar-fill" style="width:${item.biasScore}%"></span></span>`;
     const tensionHtml = item.tensionScore && item.tensionScore > 0
       ? `<span class="tension-badge" title="${escapeHtml(item.tensionReason)}">⚡${item.tensionScore}/100 ${item.tensionOrigin}&rarr;${item.tensionTarget}</span>`
       : "";
@@ -1030,7 +1056,7 @@ TEMPLATE = r"""<meta charset="utf-8">
             <span class="score-badge" style="--stamp-rot:${rot}deg"${impactReasonHtml}>${item.score}</span>
             <div class="card-heading">
               <a class="card-title" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${trustHtml}${lockBadge}${stanceHtml}${sentimentHtml}${tensionHtml}${dateHtml}</p>
+              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${trustHtml}${biasBarHtml}${lockBadge}${stanceHtml}${sentimentHtml}${tensionHtml}${dateHtml}</p>
             </div>
           </div>
           ${allTagsHtml}

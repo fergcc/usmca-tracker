@@ -135,3 +135,33 @@ class DeepSeekClient:
             return None
         reason = parts[3].strip()[:150] if len(parts) > 3 else ""
         return (origin, target, score, reason)
+
+    def assess_bias(self, text: str, system_prompt: str, user_prompt: str) -> tuple[int, str]:
+        user_msg = user_prompt.format(text=text[:4000])
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ]
+        result = self.chat(messages, temperature=0.1, max_tokens=200)
+        parts = result.split("|", 1)
+        try:
+            score = max(0, min(100, int(parts[0].strip())))
+        except (ValueError, IndexError):
+            score = 50
+        reason = parts[1].strip()[:150] if len(parts) > 1 else ""
+        return (score, reason)
+
+    def assess_bias(self, text: str, system_prompt: str, user_prompt: str) -> tuple[int, str]:
+        user_msg = user_prompt.format(text=text[:4000])
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ]
+        result = self.chat(messages, temperature=0.2, max_tokens=200)
+        parts = result.split("|", 1)
+        try:
+            score = max(0, min(100, int(parts[0].strip())))
+        except (ValueError, IndexError):
+            score = 30
+        reason = parts[1].strip()[:200] if len(parts) > 1 else ""
+        return score, reason
