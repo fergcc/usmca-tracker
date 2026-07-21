@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .analyzer import Analyzer
 from .deepseek_client import DeepSeekClient
@@ -16,7 +17,7 @@ from .fallback import calculate_fallback_score
 AI_FIELDS = [
     "impactScore", "impactReason", "aiSummary", "sentiment", "aiEntities",
     "stance", "tensionScore", "tensionOrigin", "tensionTarget", "tensionReason",
-    "biasScore", "biasReason",
+    "contentBiasScore", "biasScore", "biasReason",
 ]
 
 
@@ -63,6 +64,14 @@ def _merge_items(
     return existing
 
 
+def _source_metrics_available(item: dict[str, Any]) -> bool:
+    """A Google redirect alone is not enough to rate the underlying outlet."""
+    if item.get("publisher_url"):
+        return True
+    host = urlparse(item.get("url", "")).netloc.lower().removeprefix("www.")
+    return host != "news.google.com"
+
+
 class Enricher:
     def __init__(
         self,
@@ -103,26 +112,46 @@ class Enricher:
 
         items_to_enrich = items
         if skip_existing:
-            items_to_enrich = [it for it in items if "impactScore" not in it
-                               or it.get("impactScore", 0) == 0]
+            # Full analysis is only needed for new records. Older records that
+            # lack contentBiasScore receive a much cheaper bias-only refresh
+            # below, preserving their prior summaries and entity analysis.
+            items_to_enrich = [
+                it for it in items
+                if "impactScore" not in it
+                or it.get("impactScore", 0) == 0
+            ]
             already = len(items) - len(items_to_enrich)
             if already:
                 print(f"[enricher] {already} items already enriched — skipping.")
 
-        if not items_to_enrich:
-            print("[enricher] All items already enriched.")
-            for it in items:
-                it["trustScore"] = get_trust(it.get("url", ""), config)
-            return items
+        if items_to_enrich:
+            print(f"[enricher] Analyzing {len(items_to_enrich)} items with DeepSeek...")
+            self.analyzer.analyze_batch(items_to_enrich)
 
-        print(f"[enricher] Analyzing {len(items_to_enrich)} items with DeepSeek...")
-        self.analyzer.analyze_batch(items_to_enrich)
+        bias_refresh = [
+            it for it in items
+            if not isinstance(it.get("contentBiasScore"), (int, float))
+        ]
+        if bias_refresh:
+            print(f"[enricher] Refreshing bias for {len(bias_refresh)} records...")
+            self.analyzer.analyze_bias_batch(bias_refresh)
+        elif not items_to_enrich:
+            print("[enricher] All items already enriched.")
 
         for it in items:
-            it["trustScore"] = get_trust(it.get("url", ""), config)
-            sb = get_source_bias(it.get("url", ""), config)
-            cb = it.get("biasScore")
-            it["biasScore"] = compute_bias(sb, cb if cb else None)
+            scoring_url = it.get("publisher_url") or it.get("url", "")
+            metrics_available = _source_metrics_available(it)
+            it["sourceMetricsAvailable"] = metrics_available
+            if metrics_available:
+                it["trustScore"] = get_trust(scoring_url, config)
+                sb = get_source_bias(scoring_url, config)
+                cb = it.get("contentBiasScore")
+                if isinstance(cb, (int, float)):
+                    it["biasScore"] = compute_bias(sb, cb)
+                elif "biasScore" not in it:
+                    # A failed analysis still receives a transparent,
+                    # source-only fallback rather than an invented score.
+                    it["biasScore"] = compute_bias(sb, None)
             if not it.get("impactScore") or it.get("impactScore", 0) == 0:
                 fallback_score, fallback_reason = calculate_fallback_score(it, config)
                 it["impactScore"] = fallback_score

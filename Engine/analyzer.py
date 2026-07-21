@@ -173,11 +173,15 @@ class Analyzer:
                     system_prompt=prompt_cfg.get("system", ""),
                     user_prompt=prompt_cfg.get("user", ""),
                 )
-                return {"biasScore": score, "biasReason": reason}
+                # Preserve the content-only result.  The enricher combines it
+                # with the outlet classification into the dashboard's final
+                # biasScore; storing only the final value caused it to be
+                # weighted a second time on later runs.
+                return {"contentBiasScore": score, "biasReason": reason}
             except Exception:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
-        return {"biasScore": 0, "biasReason": ""}
+        return {"contentBiasScore": 0, "biasReason": ""}
 
     def analyze_batch(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
         total = len(articles)
@@ -186,5 +190,22 @@ class Analyzer:
             print(f"  [analyzer] Article {i}/{total}: {title_preview}...")
             ai_data = self.analyze_article(article)
             article.update(ai_data)
+            time.sleep(0.6)
+        return articles
+
+    def analyze_bias_batch(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Refresh only content-bias scores for already-enriched records."""
+        prompt_cfg = self.prompts.get("bias", {})
+        if not prompt_cfg:
+            return articles
+        total = len(articles)
+        for i, article in enumerate(articles, 1):
+            title_preview = (article.get("title", "?") or "?")[:80]
+            print(f"  [analyzer] Bias {i}/{total}: {title_preview}...")
+            text = self._truncate(article.get("summary", "") or article.get("title", ""))
+            if text.strip():
+                result = self._run_bias(text, prompt_cfg)
+                if result:
+                    article.update(result)
             time.sleep(0.6)
         return articles

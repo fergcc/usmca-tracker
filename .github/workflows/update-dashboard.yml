@@ -52,6 +52,13 @@ jobs:
             python3 usmca_tracker.py --config config.yaml
           fi
 
+      # Older Google News records only retained the Google redirect URL. Add
+      # the publisher URL from the RSS metadata before credibility/bias
+      # enrichment. Subsequent runs are a no-op once the one-time repair ends.
+      - name: Backfill original publisher metadata
+        if: github.event.inputs.backfill_images != 'true'
+        run: python3 usmca_tracker.py --config config.yaml --backfill-publishers
+
       - name: Run TMEC Engine (search + AI enrich)
         env:
           SEARCH_API_KEY: ${{ secrets.SEARCH_API_KEY }}

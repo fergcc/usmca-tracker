@@ -6,6 +6,7 @@ import html
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 PROJECT = Path(__file__).resolve().parent
 ITEMS_PATH = PROJECT / "data" / "items.jsonl"
@@ -71,6 +72,10 @@ def prep(it: dict) -> dict:
     impact_score = it.get("impactScore") or 0
     if not isinstance(impact_score, (int, float)):
         impact_score = 0
+    source_metrics_available = it.get("sourceMetricsAvailable")
+    if source_metrics_available is None:
+        host = urlparse(it.get("url", "")).netloc.lower().removeprefix("www.")
+        source_metrics_available = bool(it.get("publisher_url")) or host != "news.google.com"
     return {
         "title": title,
         "url": it["url"],
@@ -95,6 +100,7 @@ def prep(it: dict) -> dict:
         "stance": stance,
         "trustScore": it.get("trustScore", 50),
         "biasScore": it.get("biasScore", 0),
+        "sourceMetricsAvailable": bool(source_metrics_available),
     }
 
 
@@ -649,6 +655,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .trust-dot--trusted  { background: #1f7a68; }
   #dash .trust-dot--standard { background: #767d89; }
   #dash .trust-dot--low      { background: #c23a2e; }
+  #dash .source-metrics-unavailable { font-size: 0.68rem; color: var(--ink-muted); font-style: italic; }
 
   #dash .tension-badge {
     display: inline-flex; align-items: center; gap: 0.22rem;
@@ -1032,8 +1039,12 @@ TEMPLATE = r"""<meta charset="utf-8">
       ? `<span class="sentiment-badge sentiment-badge--${escapeHtml(item.sentiment)}">${escapeHtml(item.sentiment)}</span>`
       : "";
     const stanceHtml = stanceFlag(item.stance);
-    const trustHtml = `<span class="trust-indicator" title="Source trust: ${item.trustScore}/100"><span class="trust-dot trust-dot--${trustTier(item.trustScore)}"></span></span>`;
-    const biasBarHtml = `<span class="bias-bar" title="Bias: ${item.biasScore}/100"><span class="bias-bar-fill" style="width:${item.biasScore}%"></span></span>`;
+    const trustHtml = item.sourceMetricsAvailable
+      ? `<span class="trust-indicator" title="Source trust: ${item.trustScore}/100"><span class="trust-dot trust-dot--${trustTier(item.trustScore)}"></span></span>`
+      : `<span class="source-metrics-unavailable" title="Original publisher could not be verified">source profile unavailable</span>`;
+    const biasBarHtml = item.sourceMetricsAvailable
+      ? `<span class="bias-bar" title="Bias: ${item.biasScore}/100"><span class="bias-bar-fill" style="width:${item.biasScore}%"></span></span>`
+      : "";
     const tensionHtml = item.tensionScore && item.tensionScore > 0
       ? `<span class="tension-badge" title="${escapeHtml(item.tensionReason)}">⚡${item.tensionScore}/100 ${item.tensionOrigin}&rarr;${item.tensionTarget}</span>`
       : "";

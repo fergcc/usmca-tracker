@@ -88,6 +88,11 @@ class Item:
     score: int = 0
     tags: list[str] = field(default_factory=list)
     image_url: str = ""
+    # Google News' article URLs point to Google, not to the publisher.  Keep
+    # the publisher metadata from the RSS <source> element so downstream
+    # credibility and bias scoring can evaluate the actual outlet.
+    publisher: str = ""
+    publisher_url: str = ""
 
 
 # --------------------------------------------------------------------------- #
@@ -281,6 +286,27 @@ def _uid(url: str, title: str) -> str:
     return hashlib.sha1(key.encode("utf-8")).hexdigest()
 
 
+def _feedparser_publisher(entry: Any) -> tuple[str, str]:
+    """Return publisher name and URL from a feedparser RSS entry."""
+    source = entry.get("source")
+    if not source:
+        return "", ""
+    if hasattr(source, "get"):
+        return (
+            _clean(source.get("title") or source.get("name") or ""),
+            (source.get("href") or source.get("url") or "").strip(),
+        )
+    return _clean(str(source)), ""
+
+
+def _xml_publisher(node: Any) -> tuple[str, str]:
+    """Return publisher name and URL from the standard-library RSS parser."""
+    source = node.find("source")
+    if source is None:
+        return "", ""
+    return _clean(source.text or ""), (source.attrib.get("url") or "").strip()
+
+
 def parse_rss(raw: bytes, source_label: str, origin: str, limit: int) -> list[Item]:
     items: list[Item] = []
     if HAVE_FEEDPARSER:
@@ -291,7 +317,11 @@ def parse_rss(raw: bytes, source_label: str, origin: str, limit: int) -> list[It
             title = _clean(getattr(e, "title", ""))
             summary = _clean(getattr(e, "summary", ""))
             published = getattr(e, "published", "") or getattr(e, "updated", "")
-            items.append(Item(_uid(url, title), title, url, source_label, origin, published, summary))
+            publisher, publisher_url = _feedparser_publisher(e)
+            items.append(Item(
+                _uid(url, title), title, url, source_label, origin, published, summary,
+                publisher=publisher, publisher_url=publisher_url,
+            ))
     else:  # stdlib fallback
         root = ET.fromstring(raw)
         for node in root.iter("item"):
@@ -299,7 +329,11 @@ def parse_rss(raw: bytes, source_label: str, origin: str, limit: int) -> list[It
             url = (node.findtext("link") or "").strip()
             summary = _clean(node.findtext("description") or "")
             published = (node.findtext("pubDate") or "").strip()
-            items.append(Item(_uid(url, title), title, url, source_label, origin, published, summary))
+            publisher, publisher_url = _xml_publisher(node)
+            items.append(Item(
+                _uid(url, title), title, url, source_label, origin, published, summary,
+                publisher=publisher, publisher_url=publisher_url,
+            ))
             if len(items) >= limit:
                 break
     return items
@@ -683,6 +717,82 @@ def backfill_images(cfg: dict[str, Any], base: Path) -> int:
     return 0
 
 
+def _normalized_title(title: str) -> str:
+    return re.sub(r"\s+", " ", title or "").strip().casefold()
+
+
+def find_publisher_for_title(title: str, timeout: int) -> tuple[str, str]:
+    """Look up an existing Google News item and return its RSS publisher data.
+
+    Historical records predate publisher_url. Google News exposes the original
+    outlet in the RSS <source url="…"> element, which is more reliable than
+    trying to infer a domain from the title suffix.
+    """
+    query = re.sub(r"\s[-|–]\s[^-|–]{2,80}$", "", title or "").strip()
+    if not query:
+        return "", ""
+    try:
+        raw = http_get(GOOGLE_NEWS_RSS.format(q=urllib.parse.quote(query)), timeout)
+        target = _normalized_title(title)
+        for candidate in parse_rss(raw, "", "google_news", 15):
+            if _normalized_title(candidate.title) == target and candidate.publisher_url:
+                return candidate.publisher, candidate.publisher_url
+    except Exception as exc:
+        print(f"[warn] publisher lookup failed for '{title[:70]}': {exc}", file=sys.stderr)
+    return "", ""
+
+
+def publisher_from_site_feed(source_label: str, cfg: dict[str, Any]) -> tuple[str, str]:
+    """Recover the known outlet for a configured per-outlet Google News feed."""
+    for feed in cfg.get("site_feeds", []):
+        if feed.get("label") != source_label:
+            continue
+        match = re.search(r"\bsite:([a-z0-9.-]+)", feed.get("query", ""), re.I)
+        if match:
+            return source_label, f"https://{match.group(1).lower()}"
+    return "", ""
+
+
+def backfill_publishers(cfg: dict[str, Any], base: Path, limit: int | None = None) -> int:
+    """Add original-publisher metadata to older Google News records."""
+    path = base / "data" / "items.jsonl"
+    if not path.exists():
+        print(f"No items.jsonl at {path}, nothing to backfill.")
+        return 0
+
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    todo = [
+        row for row in rows
+        if row.get("origin") in {"google_news", "site_feed"}
+        and not row.get("publisher_url")
+        and urllib.parse.urlparse(row.get("url", "")).netloc.lower().endswith("news.google.com")
+    ]
+    print(f"{len(rows)} items total, {len(todo)} missing original publisher metadata.")
+    if not todo:
+        return 0
+
+    if limit is not None:
+        todo = todo[:max(0, limit)]
+
+    timeout = int(cfg.get("request", {}).get("timeout_seconds", 20))
+    updated = 0
+    for i, row in enumerate(todo, 1):
+        publisher, publisher_url = publisher_from_site_feed(row.get("source", ""), cfg)
+        if not publisher_url:
+            publisher, publisher_url = find_publisher_for_title(row.get("title", ""), timeout)
+        if publisher_url:
+            row["publisher"] = publisher
+            row["publisher_url"] = publisher_url
+            updated += 1
+        if i % 20 == 0:
+            print(f"  ...{i}/{len(todo)} processed")
+        time.sleep(0.25)  # Keep a one-off historical repair gentle on Google News.
+
+    path.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n", encoding="utf-8")
+    print(f"Publisher backfill done: {updated}/{len(todo)} records updated.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="USMCA/T-MEC/CUSMA negotiation tracker")
     ap.add_argument("--config", type=Path, default=None,
@@ -695,6 +805,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Print the Boolean queries (for Feedly/Inoreader/Alerts) and exit")
     ap.add_argument("--backfill-images", action="store_true",
                     help="One-off: fill in image_url for existing items.jsonl rows that lack one, then exit")
+    ap.add_argument("--backfill-publishers", action="store_true",
+                    help="One-off: recover original publisher URLs for older Google News records, then exit")
+    ap.add_argument("--backfill-publishers-limit", type=int, default=None,
+                    help="Process at most this many publisher backfill records (useful for local batches)")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -706,6 +820,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.backfill_images:
         return backfill_images(cfg, args.base)
+
+    if args.backfill_publishers:
+        return backfill_publishers(cfg, args.base, args.backfill_publishers_limit)
 
     return run(cfg, args.base, args.dry_run)
 
