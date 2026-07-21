@@ -11,13 +11,13 @@ from urllib.parse import urlparse
 from .analyzer import Analyzer
 from .deepseek_client import DeepSeekClient
 from .trust import get_trust
-from .bias import get_source_bias, compute_bias
+from .lean import get_source_lean, compute_lean
 from .fallback import calculate_fallback_score
 
 AI_FIELDS = [
     "impactScore", "impactReason", "aiSummary", "sentiment", "aiEntities",
     "stance", "tensionScore", "tensionOrigin", "tensionTarget", "tensionReason",
-    "contentBiasScore", "biasScore", "biasReason",
+    "contentLeanScore", "leanScore", "leanReason",
 ]
 
 
@@ -113,7 +113,7 @@ class Enricher:
         items_to_enrich = items
         if skip_existing:
             # Full analysis is only needed for new records. Older records that
-            # lack contentBiasScore receive a much cheaper bias-only refresh
+            # lack contentLeanScore receive a much cheaper lean-only refresh
             # below, preserving their prior summaries and entity analysis.
             items_to_enrich = [
                 it for it in items
@@ -128,13 +128,13 @@ class Enricher:
             print(f"[enricher] Analyzing {len(items_to_enrich)} items with DeepSeek...")
             self.analyzer.analyze_batch(items_to_enrich)
 
-        bias_refresh = [
+        lean_refresh = [
             it for it in items
-            if not isinstance(it.get("contentBiasScore"), (int, float))
+            if not isinstance(it.get("contentLeanScore"), (int, float))
         ]
-        if bias_refresh:
-            print(f"[enricher] Refreshing bias for {len(bias_refresh)} records...")
-            self.analyzer.analyze_bias_batch(bias_refresh)
+        if lean_refresh:
+            print(f"[enricher] Refreshing lean for {len(lean_refresh)} records...")
+            self.analyzer.analyze_lean_batch(lean_refresh)
         elif not items_to_enrich:
             print("[enricher] All items already enriched.")
 
@@ -144,14 +144,14 @@ class Enricher:
             it["sourceMetricsAvailable"] = metrics_available
             if metrics_available:
                 it["trustScore"] = get_trust(scoring_url, config)
-                sb = get_source_bias(scoring_url, config)
-                cb = it.get("contentBiasScore")
-                if isinstance(cb, (int, float)):
-                    it["biasScore"] = compute_bias(sb, cb)
-                elif "biasScore" not in it:
+                sl = get_source_lean(scoring_url, config)
+                cl = it.get("contentLeanScore")
+                if isinstance(cl, (int, float)):
+                    it["leanScore"] = compute_lean(sl, cl)
+                elif "leanScore" not in it:
                     # A failed analysis still receives a transparent,
                     # source-only fallback rather than an invented score.
-                    it["biasScore"] = compute_bias(sb, None)
+                    it["leanScore"] = compute_lean(sl, None)
             if not it.get("impactScore") or it.get("impactScore", 0) == 0:
                 fallback_score, fallback_reason = calculate_fallback_score(it, config)
                 it["impactScore"] = fallback_score

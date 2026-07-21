@@ -99,7 +99,7 @@ def prep(it: dict) -> dict:
         "tensionReason": clean(it.get("tensionReason", "")),
         "stance": stance,
         "trustScore": it.get("trustScore", 50),
-        "biasScore": it.get("biasScore", 0),
+        "leanScore": it.get("leanScore", 0),
         "sourceMetricsAvailable": bool(source_metrics_available),
     }
 
@@ -736,17 +736,18 @@ TEMPLATE = r"""<meta charset="utf-8">
   #dash .ew-banner.is-visible { display: flex; }
   #dash .ew-banner-icon { font-size: 1.05rem; }
 
-  /* ===== Bias Indicator ===== */
-  #dash .bias-bar {
-    display: inline-flex; vertical-align: middle; align-items: center;
-    width: 40px; height: 6px; border-radius: 3px;
-    background: var(--hairline); overflow: hidden; margin: 0 0.3rem;
+  /* ===== Lean Indicator (Trade Policy Spectrum) ===== */
+  #dash .lean-badge {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    padding: 0.1rem 0.45rem; border-radius: 999px;
+    font-size: 0.68rem; font-weight: 700; line-height: 1.3;
+    white-space: nowrap;
+    margin: 0 0.15rem;
+    border: 1px solid transparent;
   }
-  #dash .bias-bar-fill {
-    height: 100%; border-radius: 3px;
-    background: linear-gradient(90deg, #1b7a3d 0%, #c9a235 50%, #c23a2e 100%);
-    display: block;
-  }
+  #dash .lean-badge--neg { background: hsl(25, var(--lean-sat, 70%), 88%); color: hsl(25, 80%, 30%); border-color: hsl(25, 60%, 75%); }
+  #dash .lean-badge--neutral { background: hsl(0, 0%, 90%); color: hsl(0, 0%, 35%); border-color: hsl(0, 0%, 80%); }
+  #dash .lean-badge--pos { background: hsl(120, var(--lean-sat, 70%), 88%); color: hsl(130, 70%, 25%); border-color: hsl(120, 50%, 75%); }
 </style>
 
 <div class="dash" id="dash">
@@ -804,7 +805,7 @@ TEMPLATE = r"""<meta charset="utf-8">
         <div class="stat-tile glass"><p class="stat-label">Most active principal</p><p class="stat-value stat-value--text" id="statPlayer">&mdash;</p><p class="stat-sub" id="statPlayerCount">&nbsp;</p></div>
         <div class="stat-tile glass"><p class="stat-label">Sentiment trend</p><p class="stat-value stat-value--text" id="statSentiment">&mdash;</p><p class="stat-sub">articles negative</p></div>
         <div class="stat-tile glass"><p class="stat-label">Dominant stance</p><p class="stat-value stat-value--text" id="statStance">&mdash;</p><p class="stat-sub">top perspective by country</p></div>
-        <div class="stat-tile glass"><p class="stat-label">Avg bias</p><p class="stat-value stat-value--text" id="statBias">&mdash;</p><p class="stat-sub" id="statBiasLabel">&nbsp;</p></div>
+        <div class="stat-tile glass"><p class="stat-label">Trade lean</p><p class="stat-value stat-value--text" id="statLean">&mdash;</p><p class="stat-sub" id="statLeanLabel">&nbsp;</p></div>
         <div class="stat-tile glass stat-tile--composition" style="grid-column: span 2;"><p class="stat-label">Source mix</p><div class="comp-bar" id="compBar" role="img" aria-label="Source composition"></div><div class="comp-legend" id="compLegend"></div></div>
       </section>
 
@@ -926,12 +927,13 @@ TEMPLATE = r"""<meta charset="utf-8">
       document.getElementById("statStance").textContent = topStance[0] + " (" + topStance[1] + ")";
     }
 
-    const biasScores = DATA.filter(d => d.biasScore > 0).map(d => d.biasScore);
-    if (biasScores.length) {
-      const avgBias = Math.round(biasScores.reduce((a, b) => a + b, 0) / biasScores.length);
-      document.getElementById("statBias").textContent = avgBias + "/100";
-      const lbl = avgBias <= 20 ? "balanced" : avgBias <= 40 ? "mild" : avgBias <= 60 ? "moderate" : avgBias <= 80 ? "strong" : "heavy";
-      document.getElementById("statBiasLabel").textContent = "avg " + lbl;
+    const leanScores = DATA.filter(d => d.leanScore !== 0).map(d => d.leanScore);
+    if (leanScores.length) {
+      const avgLean = Math.round(leanScores.reduce((a, b) => a + b, 0) / leanScores.length);
+      const sign = avgLean >= 0 ? "+" : "";
+      document.getElementById("statLean").textContent = sign + avgLean;
+      const lbl = avgLean <= -70 ? "proteccionista" : avgLean <= -30 ? "nacionalista" : avgLean <= -10 ? "leve protecc." : avgLean < 10 ? "neutral" : avgLean < 30 ? "leve pro-TLC" : avgLean < 70 ? "pro-TLC" : "globalista";
+      document.getElementById("statLeanLabel").textContent = "avg " + lbl;
     }
 
     const compColors = { federal_register: "var(--comp-fedreg)", google_news: "var(--comp-gnews)", site_feed: "var(--comp-site)", congress: "var(--comp-congress)", search_api: "#c9a235" };
@@ -1042,8 +1044,14 @@ TEMPLATE = r"""<meta charset="utf-8">
     const trustHtml = item.sourceMetricsAvailable
       ? `<span class="trust-indicator" title="Source trust: ${item.trustScore}/100"><span class="trust-dot trust-dot--${trustTier(item.trustScore)}"></span></span>`
       : `<span class="source-metrics-unavailable" title="Original publisher could not be verified">source profile unavailable</span>`;
-    const biasBarHtml = item.sourceMetricsAvailable
-      ? `<span class="bias-bar" title="Bias: ${item.biasScore}/100"><span class="bias-bar-fill" style="width:${item.biasScore}%"></span></span>`
+    const leanBadgeHtml = item.sourceMetricsAvailable
+      ? (() => {
+          const s = item.leanScore;
+          const sat = Math.min(90, 20 + Math.round(Math.abs(s) * 0.7));
+          const label = s <= -70 ? "Protecc." : s <= -30 ? "Nacionalista" : s <= -10 ? "Leve protecc." : s < 10 ? "Neutral" : s < 30 ? "Leve pro-TLC" : s < 70 ? "Pro-TLC" : "Globalista";
+          const cls = s <= -10 ? "lean-badge--neg" : s >= 10 ? "lean-badge--pos" : "lean-badge--neutral";
+          return `<span class="lean-badge ${cls}" style="--lean-sat:${sat}%" title="Trade lean: ${s >= 0 ? '+' : ''}${s}">${label}</span>`;
+        })()
       : "";
     const tensionHtml = item.tensionScore && item.tensionScore > 0
       ? `<span class="tension-badge" title="${escapeHtml(item.tensionReason)}">⚡${item.tensionScore}/100 ${item.tensionOrigin}&rarr;${item.tensionTarget}</span>`
@@ -1067,7 +1075,7 @@ TEMPLATE = r"""<meta charset="utf-8">
             <span class="score-badge" style="--stamp-rot:${rot}deg"${impactReasonHtml}>${item.score}</span>
             <div class="card-heading">
               <a class="card-title" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${trustHtml}${biasBarHtml}${lockBadge}${stanceHtml}${sentimentHtml}${tensionHtml}${dateHtml}</p>
+              <p class="card-meta"><span class="source-pill">${escapeHtml(item.group)}</span>${trustHtml}${leanBadgeHtml}${lockBadge}${stanceHtml}${sentimentHtml}${tensionHtml}${dateHtml}</p>
             </div>
           </div>
           ${allTagsHtml}

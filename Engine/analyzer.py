@@ -55,7 +55,7 @@ class Analyzer:
             ("impact", "impact", self._run_impact),
             ("stance", "stance", self._run_stance),
             ("tension", "tension", self._run_tension),
-            ("bias", "bias", self._run_bias),
+            ("lean", "lean", self._run_lean),
         ]
 
         for prompt_key, _internal_key, fn in tasks:
@@ -165,23 +165,19 @@ class Analyzer:
                     time.sleep(self.retry_delay)
                 return None
 
-    def _run_bias(self, text: str, prompt_cfg: dict[str, str]) -> dict[str, Any] | None:
+    def _run_lean(self, text: str, prompt_cfg: dict[str, str]) -> dict[str, Any] | None:
         for attempt in range(self.max_retries):
             try:
-                score, reason = self.deepseek.assess_bias(
+                score, reason = self.deepseek.assess_lean(
                     text,
                     system_prompt=prompt_cfg.get("system", ""),
                     user_prompt=prompt_cfg.get("user", ""),
                 )
-                # Preserve the content-only result.  The enricher combines it
-                # with the outlet classification into the dashboard's final
-                # biasScore; storing only the final value caused it to be
-                # weighted a second time on later runs.
-                return {"contentBiasScore": score, "biasReason": reason}
+                return {"contentLeanScore": score, "leanReason": reason}
             except Exception:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
-        return {"contentBiasScore": 0, "biasReason": ""}
+        return {"contentLeanScore": 0, "leanReason": ""}
 
     def analyze_batch(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
         total = len(articles)
@@ -193,18 +189,18 @@ class Analyzer:
             time.sleep(0.6)
         return articles
 
-    def analyze_bias_batch(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Refresh only content-bias scores for already-enriched records."""
-        prompt_cfg = self.prompts.get("bias", {})
+    def analyze_lean_batch(self, articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Refresh only content-lean scores for already-enriched records."""
+        prompt_cfg = self.prompts.get("lean", {})
         if not prompt_cfg:
             return articles
         total = len(articles)
         for i, article in enumerate(articles, 1):
             title_preview = (article.get("title", "?") or "?")[:80]
-            print(f"  [analyzer] Bias {i}/{total}: {title_preview}...")
+            print(f"  [analyzer] Lean {i}/{total}: {title_preview}...")
             text = self._truncate(article.get("summary", "") or article.get("title", ""))
             if text.strip():
-                result = self._run_bias(text, prompt_cfg)
+                result = self._run_lean(text, prompt_cfg)
                 if result:
                     article.update(result)
             time.sleep(0.6)

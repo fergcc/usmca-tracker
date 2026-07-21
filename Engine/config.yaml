@@ -105,18 +105,21 @@ deepseek:
         Artículo:
         {text}
 
-    bias:
-      system: "You are a media bias analyst. Respond with EXACTLY the format indicated, no extra text."
+    lean:
+      system: "You are a trade-policy analyst. Respond with EXACTLY the format indicated, no extra text."
       user: |
-        Analyze this article for media bias on a scale of 0 (perfectly balanced) to 100 (heavily biased/one-sided).
+        Analyze this article's position on the free-trade vs protectionism spectrum.
+        Scale: -100 (strongly protectionist/nationalist) to +100 (strongly free-trade/globalist).
+        0 = neutral/balanced.
 
-        Evaluate these 3 sub-dimensions:
-        1. Language framing (0-50): loaded terms, sensationalism, emotional language
-        2. Source balance (0-30): are all countries' views represented or is it one-sided?
-        3. Fact vs opinion (0-20): is this neutral reporting or editorializing?
+        Evaluate these 4 sub-dimensions:
+        1. Tariff & barrier stance (-40 to +40): does it favor or oppose tariffs, barriers, sanctions?
+        2. National sovereignty vs integration (-25 to +25): national-interest-first framing vs regional-integration framing?
+        3. Economic nationalism vs globalism (-20 to +20): "us first" rhetoric vs open-markets rhetoric?
+        4. Government intervention (-15 to +15): supports state control of trade vs market-driven trade?
 
         Respond EXACTLY in this format, one line:
-        BIAS_SCORE|REASON (max 130 chars)
+        LEAN_SCORE|REASON (max 130 chars)
 
         Article:
         {text}
@@ -293,62 +296,62 @@ scoring:
     industry: { score: 60, domains: [nam.org, businessroundtable.org, steel.org, aisi.org, nppc.org, nmfp.org, farmprogress.com, brownfieldagnews.com, agweb.com, farms.com, rfdtv.com] }
     aggregator: { score: 35, domains: [yahoo.com, msn.com, google.com, news.google.com, substack.com, medium.com, opportimes.com] }
 
-  source_bias:
-    ustr.gov: { country: US, lean: admin-aligned, bias: 85 }
-    whitehouse.gov: { country: US, lean: admin-aligned, bias: 85 }
-    state.gov: { country: US, lean: admin-aligned, bias: 80 }
-    economy.gob.mx: { country: MX, lean: admin-aligned, bias: 80 }
-    dof.gob.mx: { country: MX, lean: admin-aligned, bias: 75 }
-    international.gc.ca: { country: CA, lean: admin-aligned, bias: 75 }
-    pm.gc.ca: { country: CA, lean: admin-aligned, bias: 75 }
-    federalregister.gov: { country: US, lean: neutral, bias: 20 }
-    congress.gov: { country: US, lean: neutral, bias: 20 }
-    bloomberg.com: { country: US, lean: centrist, bias: 25 }
-    reuters.com: { country: MULTI, lean: centrist, bias: 10 }
-    ft.com: { country: MULTI, lean: centrist, bias: 20 }
-    wsj.com: { country: US, lean: center-right, bias: 40 }
-    nytimes.com: { country: US, lean: center-left, bias: 35 }
-    washingtonpost.com: { country: US, lean: center-left, bias: 35 }
-    economist.com: { country: MULTI, lean: center-right, bias: 30 }
-    insidetrade.com: { country: US, lean: trade-specialized, bias: 45 }
-    politico.com: { country: US, lean: centrist, bias: 30 }
-    law360.com: { country: US, lean: legal-neutral, bias: 15 }
-    csis.org: { country: US, lean: center-right, bias: 30 }
-    brookings.edu: { country: US, lean: center-left, bias: 30 }
-    atlanticcouncil.org: { country: US, lean: centrist, bias: 25 }
-    cfr.org: { country: US, lean: centrist, bias: 25 }
-    apnews.com: { country: US, lean: neutral, bias: 15 }
-    eluniversal.com.mx: { country: MX, lean: centrist, bias: 40 }
-    elfinanciero.com.mx: { country: MX, lean: center-left, bias: 45 }
-    cbc.ca: { country: CA, lean: center-left, bias: 35 }
-    theglobeandmail.com: { country: CA, lean: centrist, bias: 25 }
-    thehill.com: { country: US, lean: centrist, bias: 25 }
-    bbc.com: { country: MULTI, lean: neutral, bias: 15 }
-    aljazeera.com: { country: MULTI, lean: center-left, bias: 25 }
-    newsweek.com: { country: US, lean: centrist, bias: 25 }
-    opportimes.com: { country: MX, lean: center-left, bias: 35 }
-    mexicobusiness.news: { country: MX, lean: pro-business, bias: 30 }
-    rethinktrade.org: { country: US, lean: left, bias: 45 }
-    as-coa.org: { country: US, lean: centrist, bias: 20 }
-    rfdtv.com: { country: US, lean: ag-focused, bias: 25 }
-    agweb.com: { country: US, lean: ag-focused, bias: 25 }
-    farmprogress.com: { country: US, lean: ag-focused, bias: 25 }
-    yahoo.com: { country: MULTI, lean: aggregator, bias: 10 }
-    substack.com: { country: MULTI, lean: individual, bias: 50 }
-    medium.com: { country: MULTI, lean: individual, bias: 45 }
-    bostonconsultinggroup.com: { country: MULTI, lean: business, bias: 20 }
-    rbc.com: { country: CA, lean: financial, bias: 25 }
-    s&pglobal.com: { country: MULTI, lean: financial, bias: 15 }
-    americasquarterly.org: { country: US, lean: centrist, bias: 20 }
-    bakerinstitute.org: { country: US, lean: center-right, bias: 30 }
-    wilsoncenter.org: { country: US, lean: centrist, bias: 20 }
-    piie.com: { country: US, lean: centrist, bias: 20 }
-    allianceforamericanmanufacturing.org: { country: US, lean: left, bias: 45 }
-    aisi.org: { country: US, lean: industry, bias: 40 }
-    nam.org: { country: US, lean: industry, bias: 40 }
-    steel.org: { country: US, lean: industry, bias: 40 }
-    dal.ca: { country: CA, lean: academic, bias: 20 }
-    hcamag.com: { country: CA, lean: centrist, bias: 30 }
+  source_lean:
+    ustr.gov: { country: US, lean: admin-aligned, leanScore: -70 }
+    whitehouse.gov: { country: US, lean: admin-aligned, leanScore: -70 }
+    state.gov: { country: US, lean: admin-aligned, leanScore: -65 }
+    economy.gob.mx: { country: MX, lean: admin-aligned, leanScore: -65 }
+    dof.gob.mx: { country: MX, lean: admin-aligned, leanScore: -60 }
+    international.gc.ca: { country: CA, lean: admin-aligned, leanScore: -55 }
+    pm.gc.ca: { country: CA, lean: admin-aligned, leanScore: -55 }
+    federalregister.gov: { country: US, lean: neutral, leanScore: 0 }
+    congress.gov: { country: US, lean: neutral, leanScore: 0 }
+    bloomberg.com: { country: US, lean: centrist, leanScore: +10 }
+    reuters.com: { country: MULTI, lean: centrist, leanScore: +5 }
+    ft.com: { country: MULTI, lean: centrist, leanScore: +10 }
+    wsj.com: { country: US, lean: center-right, leanScore: +40 }
+    nytimes.com: { country: US, lean: center-left, leanScore: +20 }
+    washingtonpost.com: { country: US, lean: center-left, leanScore: +20 }
+    economist.com: { country: MULTI, lean: center-right, leanScore: +35 }
+    insidetrade.com: { country: US, lean: trade-specialized, leanScore: +15 }
+    politico.com: { country: US, lean: centrist, leanScore: +10 }
+    law360.com: { country: US, lean: legal-neutral, leanScore: +10 }
+    csis.org: { country: US, lean: center-right, leanScore: +35 }
+    brookings.edu: { country: US, lean: center-left, leanScore: +25 }
+    atlanticcouncil.org: { country: US, lean: centrist, leanScore: +10 }
+    cfr.org: { country: US, lean: centrist, leanScore: +10 }
+    apnews.com: { country: US, lean: neutral, leanScore: 0 }
+    eluniversal.com.mx: { country: MX, lean: centrist, leanScore: +10 }
+    elfinanciero.com.mx: { country: MX, lean: center-left, leanScore: +20 }
+    cbc.ca: { country: CA, lean: center-left, leanScore: +25 }
+    theglobeandmail.com: { country: CA, lean: centrist, leanScore: +10 }
+    thehill.com: { country: US, lean: centrist, leanScore: +10 }
+    bbc.com: { country: MULTI, lean: neutral, leanScore: 0 }
+    aljazeera.com: { country: MULTI, lean: center-left, leanScore: +10 }
+    newsweek.com: { country: US, lean: centrist, leanScore: +10 }
+    opportimes.com: { country: MX, lean: center-left, leanScore: +20 }
+    mexicobusiness.news: { country: MX, lean: pro-business, leanScore: +30 }
+    rethinktrade.org: { country: US, lean: left, leanScore: -30 }
+    as-coa.org: { country: US, lean: centrist, leanScore: +10 }
+    rfdtv.com: { country: US, lean: ag-focused, leanScore: +50 }
+    agweb.com: { country: US, lean: ag-focused, leanScore: +50 }
+    farmprogress.com: { country: US, lean: ag-focused, leanScore: +50 }
+    yahoo.com: { country: MULTI, lean: aggregator, leanScore: 0 }
+    substack.com: { country: MULTI, lean: individual, leanScore: -20 }
+    medium.com: { country: MULTI, lean: individual, leanScore: -20 }
+    bostonconsultinggroup.com: { country: MULTI, lean: business, leanScore: +30 }
+    rbc.com: { country: CA, lean: financial, leanScore: +25 }
+    s&pglobal.com: { country: MULTI, lean: financial, leanScore: +15 }
+    americasquarterly.org: { country: US, lean: centrist, leanScore: +10 }
+    bakerinstitute.org: { country: US, lean: center-right, leanScore: +35 }
+    wilsoncenter.org: { country: US, lean: centrist, leanScore: +10 }
+    piie.com: { country: US, lean: centrist, leanScore: +15 }
+    allianceforamericanmanufacturing.org: { country: US, lean: left, leanScore: -25 }
+    aisi.org: { country: US, lean: industry, leanScore: +40 }
+    nam.org: { country: US, lean: industry, leanScore: +40 }
+    steel.org: { country: US, lean: industry, leanScore: +40 }
+    dal.ca: { country: CA, lean: academic, leanScore: 0 }
+    hcamag.com: { country: CA, lean: centrist, leanScore: +10 }
 
   early_warning:
     enabled: true
