@@ -104,17 +104,57 @@ def prep(it: dict) -> dict:
     }
 
 
+def _read_jsonl(path: Path) -> list:
+    items = []
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                items.append(json.loads(line))
+    return items
+
+
+def _scored_fraction(items: list) -> float:
+    if not items:
+        return 0.0
+    return sum(1 for it in items if it.get("impactScore")) / len(items)
+
+
+def _guard_against_corrupted_source(enriched_path: Path, raw_items: list) -> list:
+    """Refuse to publish a dashboard built from data that's lost its AI scoring.
+
+    items_enriched.jsonl is gitignored, so a bad overwrite (an ad-hoc script,
+    a bug, any tool poking at the pipeline) never shows up in git history.
+    This is the last gate before dashboard.html goes out, so it checks
+    independently of whatever wrote the file. `.bak` is written by
+    Engine.enrich after every successful enrichment run — if the live file
+    looks badly regressed against it, fall back to the backup instead of
+    shipping a dashboard full of zeroed-out scores.
+    """
+    fraction = _scored_fraction(raw_items)
+    backup_path = enriched_path.with_suffix(enriched_path.suffix + ".bak")
+    if fraction < 0.5 and backup_path.exists():
+        backup_items = _read_jsonl(backup_path)
+        backup_fraction = _scored_fraction(backup_items)
+        if backup_fraction - fraction > 0.2:
+            print(
+                f"[build_dashboard] WARNING: {enriched_path.name} has only "
+                f"{fraction:.0%} of items scored (backup has {backup_fraction:.0%}). "
+                f"This looks like a regression — falling back to {backup_path.name}. "
+                f"Re-run `python -m Engine.engine enrich` to refresh scoring properly."
+            )
+            return backup_items
+    return raw_items
+
+
 def main():
     enriched_path = PROJECT / "data" / "items_enriched.jsonl"
     source_path = enriched_path if enriched_path.exists() else ITEMS_PATH
     if enriched_path.exists():
         print(f"Using enriched data: {enriched_path}")
-    raw_items = []
-    with source_path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                raw_items.append(json.loads(line))
+    raw_items = _read_jsonl(source_path)
+    if source_path == enriched_path:
+        raw_items = _guard_against_corrupted_source(enriched_path, raw_items)
 
     items = [prep(it) for it in raw_items]
     items.sort(key=lambda i: (-i["score"], -(i["publishedTs"] or 0)))

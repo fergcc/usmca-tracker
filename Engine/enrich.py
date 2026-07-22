@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -46,6 +48,70 @@ def _save_jsonl(path: str | Path, items: list[dict[str, Any]]) -> None:
     lines = [json.dumps(it, ensure_ascii=False) + "\n" for it in items]
     p.write_text("".join(lines), encoding="utf-8")
     print(f"[enricher] Wrote {len(items)} items to {p}")
+
+
+_READONLY = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH  # 0o444
+_OWNER_WRITABLE = _READONLY | stat.S_IWUSR  # 0o644
+
+
+def _unlock_writable(path: str | Path) -> None:
+    p = Path(path)
+    if p.exists():
+        os.chmod(p, _OWNER_WRITABLE)
+
+
+def _lock_readonly(path: str | Path) -> None:
+    p = Path(path)
+    if p.exists():
+        os.chmod(p, _READONLY)
+
+
+def _save_enriched_output(output_path: str | Path, items: list[dict[str, Any]]) -> None:
+    """The one place allowed to write the enriched dataset.
+
+    The file (and its .bak) are left read-only (0o444) so that any other
+    script or tool — from this repo or another AI editing it in parallel —
+    gets a hard OS-level PermissionError if it tries to overwrite them
+    directly, instead of silently wiping impactScore/trustScore/aiSummary/
+    leanScore/etc. for everything already enriched.
+    """
+    backup_path = str(output_path) + ".bak"
+    _unlock_writable(output_path)
+    _save_jsonl(output_path, items)
+    _lock_readonly(output_path)
+
+    _unlock_writable(backup_path)
+    _save_jsonl(backup_path, items)
+    _lock_readonly(backup_path)
+
+
+def _scored_fraction(items: list[dict[str, Any]]) -> float:
+    if not items:
+        return 0.0
+    scored = sum(1 for it in items if it.get("impactScore"))
+    return scored / len(items)
+
+
+def _check_no_regression(output_path: str | Path, new_items: list[dict[str, Any]]) -> None:
+    """Refuse to overwrite a fully-enriched file with one that has lost its AI fields.
+
+    Guards against exactly what happened once before: a script that reloads raw
+    items and writes them back out, silently wiping impactScore/trustScore/etc.
+    for everything already enriched.
+    """
+    previous = _load_jsonl(output_path)
+    if not previous:
+        return
+    old_fraction = _scored_fraction(previous)
+    new_fraction = _scored_fraction(new_items)
+    if old_fraction > 0.5 and new_fraction < old_fraction - 0.2:
+        raise RuntimeError(
+            f"[enricher] Refusing to overwrite {output_path}: previously "
+            f"{old_fraction:.0%} of items had impactScore, new data only has "
+            f"{new_fraction:.0%}. This looks like a regression (e.g. a script "
+            f"reloading raw items and losing prior enrichment) rather than a "
+            f"real update — aborting instead of silently zeroing out scores."
+        )
 
 
 def _merge_items(
@@ -158,7 +224,8 @@ class Enricher:
                 it["impactReason"] = it.get("impactReason", "") or fallback_reason
 
         if output_path:
-            _save_jsonl(output_path, items)
+            _check_no_regression(output_path, items)
+            _save_enriched_output(output_path, items)
 
         return items
 
